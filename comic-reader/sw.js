@@ -15,6 +15,7 @@ const SHELL_FILES = [
   './manifest.json',
 ];
 
+
 self.addEventListener('install', (e) => {
   e.waitUntil(
     caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_FILES))
