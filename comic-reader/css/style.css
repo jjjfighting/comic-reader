@@ -527,3 +527,27 @@ body {
 
 /* Utility */
 .hidden { display: none !important; }
+
+/* Toast notification */
+.toast {
+  position: fixed;
+  bottom: max(30px, env(safe-area-inset-bottom));
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: var(--bg-secondary);
+  color: var(--text);
+  padding: 12px 24px;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+  font-size: 14px;
+  z-index: 500;
+  opacity: 0;
+  transition: opacity 0.3s, transform 0.3s;
+  max-width: 90vw;
+  text-align: center;
+}
+
+.toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}

@@ -110,7 +110,19 @@ function bindLibraryEvents(app, categories) {
   document.getElementById('file-input').onchange = async (e) => {
     const files = e.target.files;
     if (!files.length) return;
-    await importFiles(Array.from(files));
+    showToast('正在导入...');
+    try {
+      const results = await importFiles(Array.from(files));
+      const succeeded = results.filter(r => r.success).length;
+      const failed = results.filter(r => !r.success);
+      if (failed.length === 0) {
+        showToast(`导入成功！共 ${succeeded} 部漫画`);
+      } else {
+        showToast(`${succeeded} 部成功，${failed.length} 部失败：${failed.map(f => f.error).join(', ')}`);
+      }
+    } catch (err) {
+      showToast('导入失败：' + err.message);
+    }
     e.target.value = '';
     renderLibrary(app);
   };
@@ -239,4 +251,21 @@ function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+function showToast(message) {
+  const existing = document.querySelector('.toast');
+  if (existing) existing.remove();
+
+  const toast = document.createElement('div');
+  toast.className = 'toast';
+  toast.textContent = message;
+  document.body.appendChild(toast);
+
+  requestAnimationFrame(() => toast.classList.add('show'));
+
+  setTimeout(() => {
+    toast.classList.remove('show');
+    setTimeout(() => toast.remove(), 300);
+  }, 3000);
 }
