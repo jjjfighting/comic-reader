@@ -18,7 +18,7 @@ export async function renderReader(app, comicId) {
         <button class="back-btn" id="reader-back">‹</button>
         <span class="title">${escapeHtml(comic.name)}</span>
       </div>
-      <div class="reader-scroll" id="reader-scroll">
+      <div class="reader-scroll" id="reader-scroll" style="visibility:hidden;">
         <div class="reader-images" id="reader-images">
           ${imageIds.map((id, i) => `
             <div class="reader-img-slot" data-img-index="${i}" data-img-id="${id}">
@@ -93,7 +93,7 @@ export async function renderReader(app, comicId) {
     debouncedSave(comic, closestIndex, scrollEl.scrollTop);
   });
 
-  // Restore scroll position
+  // Restore scroll position (content is hidden until positioned)
   if (comic.lastReadImageIndex > 0 && imageIds.length > 0) {
     const targetSlot = document.querySelector(`[data-img-index="${Math.min(comic.lastReadImageIndex, imageIds.length - 1)}"]`);
     if (targetSlot) {
@@ -112,6 +112,15 @@ export async function renderReader(app, comicId) {
       targetSlot.scrollIntoView({ block: 'start' });
     }
   }
+
+  // Show content after position is set
+  scrollEl.style.visibility = 'visible';
+  // Update initial progress display
+  lastVisibleIndex = comic.lastReadImageIndex || 0;
+  const initialPct = imageIds.length > 0 ? Math.round((lastVisibleIndex + 1) / imageIds.length * 100) : 0;
+  progressEl.style.width = initialPct + '%';
+  pageInfoEl.textContent = `第 ${lastVisibleIndex + 1}/${imageIds.length} 页`;
+  percentEl.textContent = initialPct + '%';
 
   const visHandler = () => {
     if (document.visibilityState === 'hidden') {

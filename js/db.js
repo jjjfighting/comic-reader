@@ -116,7 +116,10 @@ export async function getComicImageIds(comicId) {
     req.onsuccess = (e) => {
       const cursor = e.target.result;
       if (cursor) {
-        ids.push(cursor.value.id);
+        // Skip cover thumbnail entries
+        if (!cursor.value.id.endsWith('/__cover__')) {
+          ids.push(cursor.value.id);
+        }
         cursor.continue();
       } else {
         ids.sort((a, b) => {
