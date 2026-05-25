@@ -194,15 +194,40 @@ body {
 
 .comic-row {
   display: flex;
-  gap: 12px;
-  padding: 10px;
   background: var(--bg-secondary);
   border-radius: 10px;
-  cursor: pointer;
-  text-decoration: none;
-  color: var(--text);
   box-shadow: var(--shadow);
   align-items: center;
+  overflow: hidden;
+}
+
+.comic-row-link {
+  display: flex;
+  gap: 12px;
+  flex: 1;
+  padding: 10px;
+  align-items: center;
+  text-decoration: none;
+  color: var(--text);
+  min-width: 0;
+}
+
+.comic-delete-btn {
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 16px;
+  padding: 10px 14px;
+  cursor: pointer;
+  flex-shrink: 0;
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+}
+
+.comic-delete-btn:active {
+  color: #ff3b30;
+  background: rgba(255, 59, 48, 0.1);
 }
 
 .comic-cover {

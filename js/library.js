@@ -80,17 +80,20 @@ function recentCardHTML(comic) {
 function comicRowHTML(comic) {
   const progress = comic.totalImages > 0 ? Math.round(comic.lastReadImageIndex / comic.totalImages * 100) : 0;
   return `
-    <a class="comic-row" href="#/reader/${comic.id}" data-nav data-comic-id="${comic.id}">
-      <div class="comic-cover" data-cover-id="${comic.id}">
-        <span class="placeholder-icon">📖</span>
-      </div>
-      <div class="comic-info">
-        <div class="comic-name">${escapeHtml(comic.name)}</div>
-        <div class="comic-meta">${comic.totalImages}页 · 已读${progress}%</div>
-        <div class="comic-progress-bar"><div class="comic-progress-fill" style="width:${progress}%"></div></div>
-      </div>
-      <span class="comic-chevron">›</span>
-    </a>
+    <div class="comic-row" data-comic-id="${comic.id}">
+      <a class="comic-row-link" href="#/reader/${comic.id}" data-nav>
+        <div class="comic-cover" data-cover-id="${comic.id}">
+          <span class="placeholder-icon">📖</span>
+        </div>
+        <div class="comic-info">
+          <div class="comic-name">${escapeHtml(comic.name)}</div>
+          <div class="comic-meta">${comic.totalImages}页 · 已读${progress}%</div>
+          <div class="comic-progress-bar"><div class="comic-progress-fill" style="width:${progress}%"></div></div>
+        </div>
+        <span class="comic-chevron">›</span>
+      </a>
+      <button class="comic-delete-btn" data-delete-id="${comic.id}">✕</button>
+    </div>
   `;
 }
 
@@ -131,6 +134,23 @@ function bindLibraryEvents(app, categories) {
     renderCategoryManageSheet(categories, async (updatedCats) => {
       document.querySelector('.modal-overlay')?.remove();
       renderLibrary(app);
+    });
+  });
+
+  // Delete buttons
+  app.querySelectorAll('.comic-delete-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const comicId = btn.dataset.deleteId;
+      const row = btn.closest('.comic-row');
+      const name = row.querySelector('.comic-name')?.textContent || '这部漫画';
+      if (confirm(`确定删除「${name}」？此操作不可恢复。`)) {
+        showToast('正在删除...');
+        await deleteComic(comicId);
+        showToast('已删除');
+        renderLibrary(app);
+      }
     });
   });
 
