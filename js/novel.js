@@ -1,0 +1,297 @@
+import { getAllNovels, getAllNovelTags, getNovel, deleteNovel, addNovelTag, deleteNovelTag } from './db.js';
+import { importNovelFiles } from './novelImport.js';
+import { renderTabBar } from './library.js';
+
+export async function renderNovelPage(app) {
+  const novels = await getAllNovels();
+  const tags = await getAllNovelTags();
+  const allSorted = [...novels].sort((a, b) => new Date(b.importDate) - new Date(a.importDate));
+
+  app.innerHTML = `
+    <div class="header">
+      <span class="header-title">小说</span>
+      <div class="header-actions">
+        <button class="header-btn" id="novel-manage-tags">🏷️</button>
+        <button class="header-btn" id="novel-import-btn">＋</button>
+      </div>
+    </div>
+    <div class="search-bar">
+      <input type="text" placeholder="搜索小说" id="novel-search-input">
+    </div>
+    <div class="section">
+      <div class="chips" id="novel-tag-chips">
+        <button class="chip active" data-tag="all">全部</button>
+        ${tags.map(t => `<button class="chip" data-tag-id="${t.id}">${escapeHtml(t.name)}</button>`).join('')}
+        <button class="chip" id="novel-add-tag">＋</button>
+      </div>
+    </div>
+    <div class="section">
+      ${allSorted.length === 0 ? `
+        <div class="empty-state">
+          <div class="icon">📖</div>
+          <p>还没有小说，点击右上角 ＋ 导入</p>
+        </div>
+      ` : `
+        <div class="comic-list" id="novel-list">
+          ${allSorted.map(n => novelRowHTML(n)).join('')}
+        </div>
+      `}
+    </div>
+  `;
+
+  bindNovelEvents(app, allSorted, tags);
+  renderTabBar(app, 'novel');
+}
+
+function novelRowHTML(novel) {
+  const progress = novel.totalChars > 0 ? Math.round(novel.lastReadOffset / novel.totalChars * 100) : 0;
+  return `
+    <div class="comic-row" data-novel-id="${novel.id}">
+      <a class="comic-row-link" href="#/novel-reader/${novel.id}" data-nav>
+        <div class="novel-icon">📄</div>
+        <div class="comic-info">
+          <div class="comic-name">${escapeHtml(novel.name)}</div>
+          <div class="comic-meta">${(novel.totalChars / 10000).toFixed(1)}万字 · 已读${progress}%</div>
+          <div class="comic-progress-bar"><div class="comic-progress-fill" style="width:${progress}%"></div></div>
+        </div>
+        <span class="comic-chevron">›</span>
+      </a>
+      <button class="comic-delete-btn" data-delete-novel="${novel.id}">✕</button>
+    </div>
+  `;
+}
+
+function bindNovelEvents(app, novels, tags) {
+  // Import
+  document.getElementById('novel-import-btn')?.addEventListener('click', () => {
+    document.getElementById('novel-file-input').click();
+  });
+
+  document.getElementById('novel-file-input').onchange = async (e) => {
+    const files = e.target.files;
+    if (!files.length) return;
+    const results = await importNovelFiles(Array.from(files));
+    const succeeded = results.filter(r => r.success).length;
+    const failed = results.filter(r => !r.success);
+    if (failed.length === 0) {
+      alert(`导入成功！共 ${succeeded} 部小说`);
+    } else {
+      alert(`${succeeded} 部成功，${failed.length} 部失败：${failed.map(f => f.error).join(', ')}`);
+    }
+    e.target.value = '';
+    renderNovelPage(app);
+  };
+
+  // Search
+  document.getElementById('novel-search-input')?.addEventListener('input', (e) => {
+    const query = e.target.value.toLowerCase();
+    const filtered = novels.filter(n => n.name.toLowerCase().includes(query));
+    const list = document.getElementById('novel-list');
+    if (list) {
+      list.innerHTML = filtered.length === 0
+        ? '<div class="empty-state"><p>没有找到小说</p></div>'
+        : filtered.map(n => novelRowHTML(n)).join('');
+    }
+  });
+
+  // Tag filter
+  document.getElementById('novel-tag-chips')?.addEventListener('click', async (e) => {
+    const chip = e.target.closest('.chip');
+    if (!chip || chip.id === 'novel-add-tag') return;
+
+    // Update active state
+    document.querySelectorAll('#novel-tag-chips .chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+
+    const tagId = chip.dataset.tagId;
+    let filtered;
+    if (!tagId || chip.dataset.tag === 'all') {
+      filtered = novels;
+    } else {
+      filtered = novels.filter(n => n.tags && n.tags.includes(tagId));
+    }
+    const list = document.getElementById('novel-list');
+    if (list) {
+      list.innerHTML = filtered.length === 0
+        ? '<div class="empty-state"><p>该标签下没有小说</p></div>'
+        : filtered.map(n => novelRowHTML(n)).join('');
+    }
+  });
+
+  // Add tag
+  document.getElementById('novel-add-tag')?.addEventListener('click', async () => {
+    const name = prompt('新标签名称');
+    if (name && name.trim()) {
+      const tag = { id: crypto.randomUUID(), name: name.trim(), sortOrder: tags.length };
+      await addNovelTag(tag);
+      renderNovelPage(app);
+    }
+  });
+
+  // Manage tags
+  document.getElementById('novel-manage-tags')?.addEventListener('click', () => {
+    showTagManageSheet(tags, app);
+  });
+
+  // Delete buttons
+  app.querySelectorAll('[data-delete-novel]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const novelId = btn.dataset.deleteNovel;
+      const row = btn.closest('.comic-row');
+      const name = row.querySelector('.comic-name')?.textContent || '这部小说';
+      if (confirm(`确定删除「${name}」？此操作不可恢复。`)) {
+        await deleteNovel(novelId);
+        renderNovelPage(app);
+      }
+    });
+  });
+
+  // Long press for tag assignment
+  let pressTimer = null;
+  app.addEventListener('touchstart', (e) => {
+    const link = e.target.closest('.comic-row-link');
+    if (!link) return;
+    pressTimer = setTimeout(async () => {
+      e.preventDefault();
+      const row = link.closest('.comic-row');
+      const novelId = row.dataset.novelId;
+      const novel = await getNovel(novelId);
+      if (novel) showTagAssignSheet(tags, novel, app);
+    }, 500);
+  }, { passive: false });
+  app.addEventListener('touchend', () => clearTimeout(pressTimer));
+  app.addEventListener('touchmove', () => clearTimeout(pressTimer));
+}
+
+function showTagAssignSheet(tags, novel, app) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.onclick = (e) => { if (e.target === overlay) { overlay.remove(); } };
+
+  const sheet = document.createElement('div');
+  sheet.className = 'modal-sheet';
+  const selectedIds = new Set(novel.tags || []);
+
+  sheet.innerHTML = `
+    <div class="sheet-header">
+      <span class="sheet-title">分配标签</span>
+      <button class="sheet-close">完成</button>
+    </div>
+    <div class="cat-list"></div>
+  `;
+
+  const listEl = sheet.querySelector('.cat-list');
+  const closeBtn = sheet.querySelector('.sheet-close');
+
+  function renderList() {
+    listEl.innerHTML = '';
+    if (tags.length === 0) {
+      listEl.innerHTML = '<p style="color:var(--text-secondary);text-align:center;padding:20px;">还没有标签，先去创建一个吧</p>';
+      return;
+    }
+    for (const tag of tags) {
+      const item = document.createElement('div');
+      item.className = 'cat-item';
+      item.innerHTML = `
+        <span class="cat-name">${escapeHtml(tag.name)}</span>
+        ${selectedIds.has(tag.id) ? '<span style="color:var(--accent)">✓</span>' : ''}
+      `;
+      item.onclick = () => {
+        if (selectedIds.has(tag.id)) selectedIds.delete(tag.id);
+        else selectedIds.add(tag.id);
+        renderList();
+      };
+      listEl.appendChild(item);
+    }
+  }
+
+  closeBtn.onclick = async () => {
+    novel.tags = [...selectedIds];
+    const { updateNovel } = await import('./db.js');
+    await updateNovel(novel);
+    overlay.remove();
+  };
+
+  renderList();
+  overlay.appendChild(sheet);
+  document.body.appendChild(overlay);
+}
+
+function showTagManageSheet(tags, app) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.onclick = (e) => { if (e.target === overlay) { overlay.remove(); } };
+
+  const sheet = document.createElement('div');
+  sheet.className = 'modal-sheet';
+  let currentTags = [...tags];
+
+  sheet.innerHTML = `
+    <div class="sheet-header">
+      <span class="sheet-title">管理标签</span>
+      <button class="sheet-close">完成</button>
+    </div>
+    <div class="cat-list"></div>
+    <div style="display:flex;gap:8px;margin-top:16px;">
+      <input type="text" placeholder="新标签名称" style="flex:1;padding:10px 14px;border-radius:10px;border:none;background:var(--chip-bg);color:var(--text);font-size:15px;outline:none;">
+      <button class="header-btn" style="color:var(--accent);font-size:15px;">添加</button>
+    </div>
+  `;
+
+  const listEl = sheet.querySelector('.cat-list');
+  const input = sheet.querySelector('input');
+  const addBtn = sheet.querySelector('.header-btn');
+  const closeBtn = sheet.querySelector('.sheet-close');
+
+  function renderList() {
+    listEl.innerHTML = '';
+    for (const tag of currentTags) {
+      const item = document.createElement('div');
+      item.className = 'cat-item';
+      item.innerHTML = `
+        <span class="cat-name">${escapeHtml(tag.name)}</span>
+        <div class="cat-actions">
+          <button class="rename-btn">重命名</button>
+          <button class="delete-btn" style="color:#ff3b30;">删除</button>
+        </div>
+      `;
+      item.querySelector('.delete-btn').onclick = async () => {
+        await deleteNovelTag(tag.id);
+        currentTags = currentTags.filter(t => t.id !== tag.id);
+        renderList();
+      };
+      item.querySelector('.rename-btn').onclick = async () => {
+        const newName = prompt('新标签名称', tag.name);
+        if (newName && newName.trim()) {
+          tag.name = newName.trim();
+          await addNovelTag(tag);
+          renderList();
+        }
+      };
+      listEl.appendChild(item);
+    }
+  }
+
+  addBtn.onclick = async () => {
+    const name = input.value.trim();
+    if (!name) return;
+    const tag = { id: crypto.randomUUID(), name, sortOrder: currentTags.length };
+    await addNovelTag(tag);
+    currentTags.push(tag);
+    input.value = '';
+    renderList();
+  };
+
+  closeBtn.onclick = () => { overlay.remove(); renderNovelPage(app); };
+  renderList();
+  overlay.appendChild(sheet);
+  document.body.appendChild(overlay);
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}

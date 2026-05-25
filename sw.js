@@ -1,4 +1,4 @@
-const CACHE_NAME = 'comic-reader-v5';
+const CACHE_NAME = 'comic-reader-v6';
 const SHELL_FILES = [
   './',
   './index.html',
@@ -11,6 +11,9 @@ const SHELL_FILES = [
   './js/reader.js',
   './js/categories.js',
   './js/thumbnail.js',
+  './js/novel.js',
+  './js/novelImport.js',
+  './js/novelReader.js',
   './lib/jszip.min.js',
   './manifest.json',
 ];

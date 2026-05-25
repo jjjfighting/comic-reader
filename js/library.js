@@ -63,6 +63,7 @@ export async function renderLibrary(app) {
   bindLibraryEvents(app, categories);
   loadCoverImages(app, allSorted);
   loadRecentCovers(app, recent);
+  renderTabBar(app, 'comic');
 }
 
 function recentCardHTML(comic) {
@@ -288,4 +289,24 @@ function showToast(message) {
     toast.classList.remove('show');
     setTimeout(() => toast.remove(), 300);
   }, 3000);
+}
+
+export function renderTabBar(app, active) {
+  let bar = document.getElementById('tab-bar');
+  if (!bar) {
+    bar = document.createElement('div');
+    bar.id = 'tab-bar';
+    document.body.appendChild(bar);
+  }
+  bar.className = 'tab-bar';
+  bar.innerHTML = `
+    <a class="tab-item ${active === 'comic' ? 'active' : ''}" href="#/" data-nav>
+      <span class="tab-icon">📚</span>
+      <span class="tab-label">漫画</span>
+    </a>
+    <a class="tab-item ${active === 'novel' ? 'active' : ''}" href="#/novel" data-nav>
+      <span class="tab-icon">📖</span>
+      <span class="tab-label">小说</span>
+    </a>
+  `;
 }
