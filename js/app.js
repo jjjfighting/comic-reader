@@ -13,6 +13,20 @@ window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () 
   }
 });
 
+// Auto-update: detect new SW version and force reload
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    window.location.reload();
+  });
+
+  // Force check for SW update on every launch
+  navigator.serviceWorker.getRegistration().then(reg => {
+    if (reg) {
+      reg.update();
+    }
+  });
+}
+
 function route() {
   const hash = window.location.hash || '#/';
 
