@@ -1,0 +1,198 @@
+import { getComic, getComicImageIds, getImageBlob, updateComic } from './db.js';
+
+let saveTimer = null;
+let loadedUrls = [];
+
+export async function renderReader(app, comicId) {
+  const comic = await getComic(comicId);
+  if (!comic) {
+    app.innerHTML = '<div class="empty-state"><p>漫画不存在</p></div>';
+    return;
+  }
+
+  const imageIds = await getComicImageIds(comicId);
+
+  app.innerHTML = `
+    <div class="reader-page" id="reader-page">
+      <div class="reader-top-bar" id="reader-top">
+        <button class="back-btn" id="reader-back">‹</button>
+        <span class="title">${escapeHtml(comic.name)}</span>
+      </div>
+      <div class="reader-scroll" id="reader-scroll">
+        <div class="reader-images" id="reader-images">
+          ${imageIds.map((id, i) => `
+            <div class="reader-img-slot" data-img-index="${i}" data-img-id="${id}">
+              <div class="loading" style="height:400px;">加载中...</div>
+            </div>
+          `).join('')}
+        </div>
+      </div>
+      <div class="reader-bottom-bar" id="reader-bottom">
+        <div class="progress-bar"><div class="progress-fill" id="reader-progress" style="width:0%"></div></div>
+        <div class="meta">
+          <span id="reader-page-info">第 0/${imageIds.length} 页</span>
+          <span id="reader-percent">0%</span>
+        </div>
+      </div>
+    </div>
+  `;
+
+  const scrollEl = document.getElementById('reader-scroll');
+  const progressEl = document.getElementById('reader-progress');
+  const pageInfoEl = document.getElementById('reader-page-info');
+  const percentEl = document.getElementById('reader-percent');
+  const readerPage = document.getElementById('reader-page');
+
+  document.getElementById('reader-back').onclick = () => {
+    cleanupReader();
+    window.history.back();
+  };
+
+  scrollEl.addEventListener('click', () => {
+    readerPage.classList.toggle('bars-hidden');
+  });
+
+  const observer = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      if (entry.isIntersecting) {
+        const slot = entry.target;
+        loadSlotImage(slot);
+        observer.unobserve(slot);
+      }
+    }
+  }, { root: scrollEl, rootMargin: '300px' });
+
+  document.querySelectorAll('.reader-img-slot').forEach(slot => observer.observe(slot));
+
+  let lastVisibleIndex = 0;
+  scrollEl.addEventListener('scroll', () => {
+    const slots = document.querySelectorAll('.reader-img-slot');
+    const scrollRect = scrollEl.getBoundingClientRect();
+    const viewportCenter = scrollRect.top + scrollRect.height / 3;
+
+    let closestIndex = 0;
+    let closestDist = Infinity;
+    slots.forEach((slot, i) => {
+      const rect = slot.getBoundingClientRect();
+      const center = rect.top + rect.height / 2;
+      const dist = Math.abs(center - viewportCenter);
+      if (dist < closestDist) {
+        closestDist = dist;
+        closestIndex = i;
+      }
+    });
+
+    if (closestIndex !== lastVisibleIndex) {
+      lastVisibleIndex = closestIndex;
+      const pct = imageIds.length > 0 ? Math.round((closestIndex + 1) / imageIds.length * 100) : 0;
+      progressEl.style.width = pct + '%';
+      pageInfoEl.textContent = `第 ${closestIndex + 1}/${imageIds.length} 页`;
+      percentEl.textContent = pct + '%';
+    }
+
+    debouncedSave(comic, closestIndex, scrollEl.scrollTop);
+  });
+
+  // Restore scroll position
+  if (comic.lastReadImageIndex > 0 && imageIds.length > 0) {
+    const targetSlot = document.querySelector(`[data-img-index="${Math.min(comic.lastReadImageIndex, imageIds.length - 1)}"]`);
+    if (targetSlot) {
+      const waitForImage = () => {
+        return new Promise(resolve => {
+          const check = () => {
+            if (targetSlot.querySelector('img')) resolve();
+            else setTimeout(check, 100);
+          };
+          check();
+        });
+      };
+      loadSlotImage(targetSlot);
+      observer.unobserve(targetSlot);
+      await waitForImage();
+      targetSlot.scrollIntoView({ block: 'start' });
+    }
+  }
+
+  const visHandler = () => {
+    if (document.visibilityState === 'hidden') {
+      saveProgressNow(comic, lastVisibleIndex, scrollEl.scrollTop);
+    }
+  };
+  document.addEventListener('visibilitychange', visHandler);
+
+  window.addEventListener('beforeunload', beforeUnloadHandler);
+
+  function beforeUnloadHandler() {
+    saveProgressNow(comic, lastVisibleIndex, scrollEl.scrollTop);
+  }
+
+  window.__readerCleanup = () => {
+    document.removeEventListener('visibilitychange', visHandler);
+    window.removeEventListener('beforeunload', beforeUnloadHandler);
+    observer.disconnect();
+    clearTimeout(saveTimer);
+    cleanupReader();
+  };
+
+  comic.lastReadDate = new Date().toISOString();
+  await updateComic(comic);
+}
+
+async function loadSlotImage(slot) {
+  const imgId = slot.dataset.imgId;
+  if (slot.dataset.loaded) return;
+  slot.dataset.loaded = '1';
+
+  const blob = await getImageBlob(imgId);
+  if (!blob) {
+    slot.innerHTML = '<div class="loading" style="height:200px;color:#666;">图片加载失败</div>';
+    return;
+  }
+
+  const url = URL.createObjectURL(blob);
+  loadedUrls.push(url);
+
+  const img = document.createElement('img');
+  img.src = url;
+  img.loading = 'lazy';
+  img.onload = () => {
+    slot.innerHTML = '';
+    slot.appendChild(img);
+  };
+  img.onerror = () => {
+    slot.innerHTML = '<div class="loading" style="height:200px;color:#666;">加载失败</div>';
+  };
+}
+
+function debouncedSave(comic, imageIndex, scrollTop) {
+  clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    saveProgressNow(comic, imageIndex, scrollTop);
+  }, 500);
+}
+
+async function saveProgressNow(comic, imageIndex, scrollTop) {
+  comic.lastReadImageIndex = imageIndex;
+  comic.lastReadScrollOffset = scrollTop;
+  try {
+    await updateComic(comic);
+  } catch (e) {
+    console.error('Failed to save progress', e);
+  }
+}
+
+function cleanupReader() {
+  for (const url of loadedUrls) {
+    URL.revokeObjectURL(url);
+  }
+  loadedUrls = [];
+  if (window.__readerCleanup) {
+    delete window.__readerCleanup;
+  }
+}
+
+function escapeHtml(str) {
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
