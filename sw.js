@@ -1,4 +1,4 @@
-const CACHE_NAME = 'comic-reader-v1';
+const CACHE_NAME = 'comic-reader-v2';
 const SHELL_FILES = [
   './',
   './index.html',
@@ -33,6 +33,6 @@ self.addEventListener('activate', (e) => {
 
 self.addEventListener('fetch', (e) => {
   e.respondWith(
-    caches.match(e.request).then((cached) => cached || fetch(e.request))
+    fetch(e.request).catch(() => caches.match(e.request))
   );
 });
