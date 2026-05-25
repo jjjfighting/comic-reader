@@ -1,1 +1,5 @@
-node_modules/\n.superpowers/
+node_modules/
+.superpowers/
+.claude/
+docs/
+*.DS_Store
