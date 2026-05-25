@@ -14,7 +14,7 @@ function isImageFile(filename) {
 
 function sortByName(files) {
   return files.sort((a, b) =>
-    a.name.localeCompare(b.name, undefined, { numeric: true })
+    a.path.localeCompare(b.path, undefined, { numeric: true })
   );
 }
 
