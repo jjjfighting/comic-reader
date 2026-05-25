@@ -2,6 +2,7 @@ import { getNovel, getNovelText, updateNovel } from './db.js';
 
 let saveTimer = null;
 let cleanupFns = [];
+let allParagraphs = [];
 
 export async function renderNovelReader(app, novelId) {
   // Cleanup previous session
@@ -30,8 +31,12 @@ export async function renderNovelReader(app, novelId) {
   }
 
   // Split into paragraphs
-  const paragraphs = text.split(/\n+/).filter(p => p.trim());
+  allParagraphs = text.split(/\n+/).filter(p => p.trim());
+  const paragraphs = allParagraphs;
   const totalCount = paragraphs.length;
+
+  // Detect chapters
+  const chapters = detectChapters(paragraphs);
 
   // Virtual rendering: render chunks of paragraphs
   const CHUNK_SIZE = 200; // paragraphs per chunk
@@ -48,6 +53,7 @@ export async function renderNovelReader(app, novelId) {
       <div class="novel-reader-top-bar" id="novel-top-bar">
         <button class="back-btn" id="novel-back">‹</button>
         <span class="novel-title">${escapeHtml(novel.name)}</span>
+        <button class="novel-settings-btn" id="novel-toc-btn" style="font-size:14px;font-weight:400;">目录</button>
         <button class="novel-settings-btn" id="novel-settings">Aa</button>
       </div>
       <div class="novel-scroll" id="novel-scroll" style="visibility:hidden;">
@@ -149,6 +155,12 @@ export async function renderNovelReader(app, novelId) {
     settingsPanel.classList.add('hidden');
   };
   scrollEl.addEventListener('click', toggleBars);
+
+  // TOC button
+  document.getElementById('novel-toc-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
+    showTOC(chapters, scrollEl, contentEl, CHUNK_SIZE, renderVisibleChunks);
+  });
 
   // Settings
   document.getElementById('novel-settings').addEventListener('click', (e) => {
@@ -277,4 +289,107 @@ function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+function detectChapters(paragraphs) {
+  const chapters = [];
+  // Common Chinese chapter patterns
+  const chapterPatterns = [
+    /^第[零一二三四五六七八九十百千万\d]+[章节回卷集部篇话]/,
+    /^Chapter\s+\d+/i,
+    /^卷[零一二三四五六七八九十百千万\d]+/,
+    /^\d{1,5}[\.、．]\s*/,
+  ];
+
+  for (let i = 0; i < paragraphs.length; i++) {
+    const line = paragraphs[i].trim();
+    if (line.length > 2 && line.length < 60) {
+      for (const pattern of chapterPatterns) {
+        if (pattern.test(line)) {
+          chapters.push({ title: line, paragraphIndex: i });
+          break;
+        }
+      }
+    }
+  }
+
+  // If no chapters detected, create approximate chapters every 500 paragraphs
+  if (chapters.length === 0 && paragraphs.length > 500) {
+    const totalSections = Math.ceil(paragraphs.length / 500);
+    for (let i = 0; i < totalSections; i++) {
+      const start = i * 500;
+      const end = Math.min(start + 100, paragraphs.length);
+      const preview = paragraphs.slice(start, end).join(' ').slice(0, 30);
+      chapters.push({ title: `第${i + 1}部分 ${preview}...`, paragraphIndex: start });
+    }
+  }
+
+  return chapters;
+}
+
+function showTOC(chapters, scrollEl, contentEl, CHUNK_SIZE, renderVisibleChunks) {
+  // Remove existing
+  document.querySelector('.toc-overlay')?.remove();
+
+  const overlay = document.createElement('div');
+  overlay.className = 'toc-overlay';
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+  const sidebar = document.createElement('div');
+  sidebar.className = 'toc-sidebar';
+
+  sidebar.innerHTML = `
+    <div class="toc-header">
+      <h3>目录 (${chapters.length}章)</h3>
+      <button class="toc-close">关闭</button>
+    </div>
+    <div class="toc-list">
+      ${chapters.length === 0
+        ? '<div style="padding:20px;color:var(--text-secondary);text-align:center;">未检测到章节</div>'
+        : chapters.map((ch, i) => `<button class="toc-item" data-chapter="${i}">${escapeHtml(ch.title)}</button>`).join('')
+      }
+    </div>
+  `;
+
+  sidebar.querySelector('.toc-close').onclick = () => overlay.remove();
+
+  sidebar.querySelectorAll('.toc-item').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const chapterIndex = parseInt(btn.dataset.chapter);
+      const chapter = chapters[chapterIndex];
+      const targetP = chapter.paragraphIndex;
+
+      // Find the paragraph in the DOM - it's in one of the chunk divs
+      // Estimate: find the chunk and paragraph within it
+      const CHUNK_SIZE = 200;
+      const targetChunk = Math.floor(targetP / CHUNK_SIZE);
+      const indexInChunk = targetP % CHUNK_SIZE;
+
+      // Ensure the chunk is rendered first
+      const chunkEl = contentEl.querySelector(`[data-chunk="${targetChunk}"]`);
+      if (chunkEl && !chunkEl.dataset.rendered) {
+        // Force render this chunk
+        chunkEl.dataset.rendered = '1';
+        const start = targetChunk * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, allParagraphs.length);
+        let html = '';
+        for (let i = start; i < end; i++) {
+          html += `<p>${escapeHtml(allParagraphs[i])}</p>`;
+        }
+        chunkEl.innerHTML = html;
+      }
+
+      // Now find the specific paragraph
+      const pElements = chunkEl?.querySelectorAll('p');
+      if (pElements && pElements[indexInChunk]) {
+        pElements[indexInChunk].scrollIntoView({ block: 'start' });
+      }
+
+      overlay.remove();
+      renderVisibleChunks();
+    });
+  });
+
+  overlay.appendChild(sidebar);
+  document.body.appendChild(overlay);
 }
