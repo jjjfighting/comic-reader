@@ -12,6 +12,11 @@ export async function renderReader(app, comicId) {
 
   const imageIds = await getComicImageIds(comicId);
 
+  // Width mode: full, narrow, extra-narrow
+  const widthMode = localStorage.getItem('comic-width-mode') || 'full';
+  const widthMap = { full: '100%', narrow: '75%', xnarrow: '50%' };
+  const modeLabels = { full: '全宽', narrow: '窄图', xnarrow: '超窄' };
+
   app.innerHTML = `
     <div class="reader-page" id="reader-page">
       <div class="reader-top-bar" id="reader-top">
@@ -19,7 +24,7 @@ export async function renderReader(app, comicId) {
         <span class="title">${escapeHtml(comic.name)}</span>
       </div>
       <div class="reader-scroll" id="reader-scroll" style="visibility:hidden;">
-        <div class="reader-images" id="reader-images">
+        <div class="reader-images" id="reader-images" style="max-width:${widthMap[widthMode]};margin:0 auto;">
           ${imageIds.map((id, i) => `
             <div class="reader-img-slot" data-img-index="${i}" data-img-id="${id}">
               <div class="loading" style="height:400px;color:#666;">加载中...</div>
@@ -31,6 +36,7 @@ export async function renderReader(app, comicId) {
         <div class="progress-bar"><div class="progress-fill" id="reader-progress" style="width:0%"></div></div>
         <div class="meta">
           <span id="reader-page-info">第 0/${imageIds.length} 页</span>
+          <button class="reader-width-btn" id="reader-width-btn">${modeLabels[widthMode]}</button>
           <span id="reader-percent">0%</span>
         </div>
       </div>
@@ -50,6 +56,21 @@ export async function renderReader(app, comicId) {
 
   scrollEl.addEventListener('click', () => {
     readerPage.classList.toggle('bars-hidden');
+  });
+
+  // Width mode toggle
+  const imagesEl = document.getElementById('reader-images');
+  const widthBtn = document.getElementById('reader-width-btn');
+  const modes = ['full', 'narrow', 'xnarrow'];
+  let currentMode = modes.indexOf(widthMode);
+
+  widthBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    currentMode = (currentMode + 1) % modes.length;
+    const mode = modes[currentMode];
+    localStorage.setItem('comic-width-mode', mode);
+    imagesEl.style.maxWidth = widthMap[mode];
+    widthBtn.textContent = modeLabels[mode];
   });
 
   const observer = new IntersectionObserver((entries) => {

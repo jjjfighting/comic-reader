@@ -361,8 +361,19 @@ body {
 .reader-bottom-bar .meta {
   display: flex;
   justify-content: space-between;
+  align-items: center;
   color: rgba(255,255,255,0.7);
   font-size: 12px;
+}
+
+.reader-width-btn {
+  background: rgba(255,255,255,0.15);
+  border: none;
+  color: rgba(255,255,255,0.9);
+  font-size: 12px;
+  padding: 3px 10px;
+  border-radius: 10px;
+  cursor: pointer;
 }
 
 .bars-hidden .reader-top-bar {
