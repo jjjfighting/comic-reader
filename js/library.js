@@ -162,6 +162,9 @@ function bindLibraryEvents(app, categories) {
 }
 
 function setupContextMenu(app) {
+  app.addEventListener('contextmenu', (e) => {
+    if (e.target.closest('.comic-grid-link')) e.preventDefault();
+  });
   let pressTimer = null;
 
   app.addEventListener('touchstart', (e) => {

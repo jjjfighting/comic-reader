@@ -135,6 +135,9 @@ function bindNovelEvents(app, novels, tags) {
 
   // Long press for tag assignment
   let pressTimer = null;
+  app.addEventListener('contextmenu', (e) => {
+    if (e.target.closest('.comic-grid-link')) e.preventDefault();
+  });
   app.addEventListener('touchstart', (e) => {
     const link = e.target.closest('.comic-grid-link');
     if (!link) return;

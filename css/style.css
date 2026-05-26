@@ -201,6 +201,10 @@ body {
   display: block;
   text-decoration: none;
   color: var(--text);
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
 }
 
 .comic-grid-cover {
