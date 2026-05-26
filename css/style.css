@@ -703,6 +703,13 @@ body {
   color: #333;
 }
 
+.novel-content p.chapter-title {
+  text-indent: 0;
+  font-weight: bold;
+  font-size: 1.1em;
+  margin-top: 1.6em;
+}
+
 .novel-end {
   text-align: center;
   padding: 40px 0;
