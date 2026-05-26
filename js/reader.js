@@ -66,11 +66,17 @@ export async function renderReader(app, comicId) {
 
   widthBtn.addEventListener('click', (e) => {
     e.stopPropagation();
+    const targetIndex = lastVisibleIndex;
     currentMode = (currentMode + 1) % modes.length;
     const mode = modes[currentMode];
     localStorage.setItem('comic-width-mode', mode);
     imagesEl.style.maxWidth = widthMap[mode];
     widthBtn.textContent = modeLabels[mode];
+    // Restore scroll to current image after layout change
+    requestAnimationFrame(() => {
+      const slot = document.querySelector(`[data-img-index="${targetIndex}"]`);
+      if (slot) slot.scrollIntoView({ block: 'start' });
+    });
   });
 
   const observer = new IntersectionObserver((entries) => {
