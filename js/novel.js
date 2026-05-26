@@ -57,7 +57,7 @@ export async function renderNovelPage(app) {
     </div>
   `;
 
-  bindNovelEvents(app, allSorted, tags);
+  bindNovelEvents(app, allSorted, tags, signal);
   renderTabBar(app, 'novel');
 }
 
@@ -86,7 +86,7 @@ function novelGridHTML(novel) {
   `;
 }
 
-function bindNovelEvents(app, novels, tags) {
+function bindNovelEvents(app, novels, tags, signal) {
   // Import
   document.getElementById('novel-import-btn')?.addEventListener('click', () => {
     document.getElementById('novel-file-input').click();
