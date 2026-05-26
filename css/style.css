@@ -303,16 +303,22 @@ body {
   flex-direction: column;
 }
 
+.reader-page * {
+  background-color: transparent;
+}
+
 .reader-scroll {
   flex: 1;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   scroll-behavior: auto;
+  background: #000;
 }
 
 .reader-images {
   display: flex;
   flex-direction: column;
+  background: #000;
 }
 
 .reader-images img {

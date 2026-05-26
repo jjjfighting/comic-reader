@@ -22,7 +22,7 @@ export async function renderReader(app, comicId) {
         <div class="reader-images" id="reader-images">
           ${imageIds.map((id, i) => `
             <div class="reader-img-slot" data-img-index="${i}" data-img-id="${id}">
-              <div class="loading" style="height:400px;">加载中...</div>
+              <div class="loading" style="height:400px;color:#666;">加载中...</div>
             </div>
           `).join('')}
         </div>
