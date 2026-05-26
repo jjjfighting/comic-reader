@@ -65,7 +65,7 @@ export async function renderLibrary(app) {
     </div>
   `;
 
-  bindLibraryEvents(app, categories);
+  bindLibraryEvents(app, categories, signal);
   loadCoverImages(app, allSorted);
   loadRecentCovers(app, recent);
   renderTabBar(app, 'comic');
@@ -96,7 +96,7 @@ function comicGridHTML(comic) {
   `;
 }
 
-function bindLibraryEvents(app, categories) {
+function bindLibraryEvents(app, categories, signal) {
   document.getElementById('theme-btn')?.addEventListener('click', () => {
     const current = localStorage.getItem('theme') || 'system';
     const next = current === 'light' ? 'dark' : current === 'dark' ? 'system' : 'light';
