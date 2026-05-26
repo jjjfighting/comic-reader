@@ -210,7 +210,7 @@ body {
 .comic-grid-cover {
   width: 100%;
   aspect-ratio: 3/4;
-  max-height: 200px;
+  height: 120px;
   border-radius: 8px;
   background: var(--chip-bg);
   overflow: hidden;
@@ -246,7 +246,7 @@ body {
 
 .novel-grid-cover {
   aspect-ratio: auto;
-  height: 140px;
+  height: 100px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
@@ -258,7 +258,7 @@ body {
   padding: 8px;
   text-align: center;
   display: -webkit-box;
-  -webkit-line-clamp: 3;
+  -webkit-line-clamp: 5;
   -webkit-box-orient: vertical;
   overflow: hidden;
   word-break: break-all;
