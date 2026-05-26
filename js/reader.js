@@ -15,36 +15,7 @@ export async function renderReader(app, comicId) {
   // Width mode: full, narrow, extra-narrow
   const widthMode = localStorage.getItem('comic-width-mode') || 'full';
   const modeLabels = { full: '全宽', narrow: '窄图', xnarrow: '超窄' };
-
-  // Calculate n (images visible at full width) using natural image dimensions
-  function calcVisibleCount(scrollEl) {
-    const viewportH = scrollEl.clientHeight;
-    const viewportW = scrollEl.clientWidth;
-    const imgs = scrollEl.querySelectorAll('.reader-img-slot img');
-    if (imgs.length === 0) return 3;
-    let totalAspect = 0;
-    let count = 0;
-    imgs.forEach(img => {
-      if (img.naturalWidth > 0) {
-        totalAspect += img.naturalHeight / img.naturalWidth;
-        count++;
-      }
-    });
-    if (count === 0) return 3;
-    const avgAspect = totalAspect / count;
-    const imgHeightAtFull = viewportW * avgAspect;
-    return Math.max(1, Math.round(viewportH / imgHeightAtFull));
-  }
-
-  function calcWidth(mode, scrollEl) {
-    if (mode === 'full') return '100%';
-    const n = calcVisibleCount(scrollEl);
-    if (mode === 'narrow') {
-      return Math.max(30, Math.round(n / (n + 1) * 100)) + '%';
-    } else {
-      return Math.max(20, Math.round(n / (n + 2) * 100)) + '%';
-    }
-  }
+  const widthMap = { full: '100%', narrow: '80%', xnarrow: '60%' };
 
   app.innerHTML = `
     <div class="reader-page" id="reader-page">
@@ -95,8 +66,7 @@ export async function renderReader(app, comicId) {
   let fullModeAnchor = null; // remember position when leaving full mode
 
   function applyWidthMode(mode) {
-    const w = calcWidth(mode, scrollEl);
-    imagesEl.style.maxWidth = w;
+    imagesEl.style.maxWidth = widthMap[mode];
     widthBtn.textContent = modeLabels[mode];
   }
 
