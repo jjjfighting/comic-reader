@@ -1,4 +1,4 @@
-const CACHE_NAME = 'comic-reader-v15';
+const CACHE_NAME = 'comic-reader-v16';
 const SHELL_FILES = [
   './',
   './index.html',

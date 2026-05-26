@@ -32,8 +32,8 @@ export async function renderNovelPage(app) {
           <p>还没有小说，点击右上角 ＋ 导入</p>
         </div>
       ` : `
-        <div class="comic-list" id="novel-list">
-          ${allSorted.map(n => novelRowHTML(n)).join('')}
+        <div class="comic-grid" id="novel-list">
+          ${allSorted.map(n => novelGridHTML(n)).join('')}
         </div>
       `}
     </div>
@@ -43,20 +43,15 @@ export async function renderNovelPage(app) {
   renderTabBar(app, 'novel');
 }
 
-function novelRowHTML(novel) {
-  const progress = novel.totalChars > 0 ? Math.round(novel.lastReadOffset / novel.totalChars * 100) : 0;
+function novelGridHTML(novel) {
   return `
-    <div class="comic-row" data-novel-id="${novel.id}">
-      <a class="comic-row-link" href="#/novel-reader/${novel.id}" data-nav>
-        <div class="novel-icon">📄</div>
-        <div class="comic-info">
-          <div class="comic-name">${escapeHtml(novel.name)}</div>
-          <div class="comic-meta">${(novel.totalChars / 10000).toFixed(1)}万字 · 已读${progress}%</div>
-          <div class="comic-progress-bar"><div class="comic-progress-fill" style="width:${progress}%"></div></div>
+    <div class="comic-grid-item" data-novel-id="${novel.id}">
+      <a class="comic-grid-link" href="#/novel-reader/${novel.id}" data-nav>
+        <div class="comic-grid-cover novel-grid-cover">
+          <span class="novel-grid-title">${escapeHtml(novel.name)}</span>
         </div>
-        <span class="comic-chevron">›</span>
+        <button class="comic-grid-delete" data-delete-novel="${novel.id}">✕</button>
       </a>
-      <button class="comic-delete-btn" data-delete-novel="${novel.id}">✕</button>
     </div>
   `;
 }
@@ -90,7 +85,8 @@ function bindNovelEvents(app, novels, tags) {
     if (list) {
       list.innerHTML = filtered.length === 0
         ? '<div class="empty-state"><p>没有找到小说</p></div>'
-        : filtered.map(n => novelRowHTML(n)).join('');
+        : filtered.map(n => novelGridHTML(n)).join('');
+      bindDeleteButtons(app);
     }
   });
 
@@ -114,7 +110,8 @@ function bindNovelEvents(app, novels, tags) {
     if (list) {
       list.innerHTML = filtered.length === 0
         ? '<div class="empty-state"><p>该标签下没有小说</p></div>'
-        : filtered.map(n => novelRowHTML(n)).join('');
+        : filtered.map(n => novelGridHTML(n)).join('');
+      bindDeleteButtons(app);
     }
   });
 
@@ -134,28 +131,16 @@ function bindNovelEvents(app, novels, tags) {
   });
 
   // Delete buttons
-  app.querySelectorAll('[data-delete-novel]').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const novelId = btn.dataset.deleteNovel;
-      const row = btn.closest('.comic-row');
-      const name = row.querySelector('.comic-name')?.textContent || '这部小说';
-      if (confirm(`确定删除「${name}」？此操作不可恢复。`)) {
-        await deleteNovel(novelId);
-        renderNovelPage(app);
-      }
-    });
-  });
+  bindDeleteButtons(app);
 
   // Long press for tag assignment
   let pressTimer = null;
   app.addEventListener('touchstart', (e) => {
-    const link = e.target.closest('.comic-row-link');
+    const link = e.target.closest('.comic-grid-link');
     if (!link) return;
     pressTimer = setTimeout(async () => {
       e.preventDefault();
-      const row = link.closest('.comic-row');
+      const row = link.closest('.comic-grid-item');
       const novelId = row.dataset.novelId;
       const novel = await getNovel(novelId);
       if (novel) showTagAssignSheet(tags, novel, app);
@@ -288,6 +273,22 @@ function showTagManageSheet(tags, app) {
   renderList();
   overlay.appendChild(sheet);
   document.body.appendChild(overlay);
+}
+
+function bindDeleteButtons(app) {
+  app.querySelectorAll('[data-delete-novel]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const novelId = btn.dataset.deleteNovel;
+      const item = btn.closest('.comic-grid-item');
+      const name = item.querySelector('.comic-grid-name')?.textContent || '这部小说';
+      if (confirm(`确定删除「${name}」？此操作不可恢复。`)) {
+        await deleteNovel(novelId);
+        renderNovelPage(app);
+      }
+    });
+  });
 }
 
 function escapeHtml(str) {

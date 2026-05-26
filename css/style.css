@@ -260,6 +260,24 @@ body {
   overflow: hidden;
 }
 
+.novel-grid-cover {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.novel-grid-title {
+  color: #fff;
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.4;
+  padding: 10px;
+  text-align: center;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  word-break: break-all;
+}
+
 /* Reader */
 .reader-page {
   position: fixed;
