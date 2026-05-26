@@ -13,6 +13,11 @@ export async function renderNovelPage(app) {
   const tags = await getAllNovelTags();
   const allSorted = [...novels].sort((a, b) => new Date(b.importDate) - new Date(a.importDate));
 
+  const recent = novels
+    .filter(n => n.lastReadDate)
+    .sort((a, b) => new Date(b.lastReadDate) - new Date(a.lastReadDate))
+    .slice(0, 10);
+
   app.innerHTML = `
     <div class="header">
       <span class="header-title">小说</span>
@@ -21,9 +26,16 @@ export async function renderNovelPage(app) {
         <button class="header-btn" id="novel-import-btn">＋</button>
       </div>
     </div>
-    <div class="search-bar">
-      <input type="text" placeholder="搜索小说" id="novel-search-input">
-    </div>
+
+    ${recent.length > 0 ? `
+      <div class="section">
+        <div class="section-title">最近阅读</div>
+        <div class="recent-scroll" id="novel-recent-scroll">
+          ${recent.map(n => novelRecentHTML(n)).join('')}
+        </div>
+      </div>
+    ` : ''}
+
     <div class="section">
       <div class="chips" id="novel-tag-chips">
         <button class="chip active" data-tag="all">全部</button>
@@ -47,6 +59,19 @@ export async function renderNovelPage(app) {
 
   bindNovelEvents(app, allSorted, tags);
   renderTabBar(app, 'novel');
+}
+
+function novelRecentHTML(novel) {
+  const progress = novel.totalChars > 0 ? Math.round(novel.lastReadOffset / novel.totalChars * 100) : 0;
+  return `
+    <a class="recent-card" href="#/novel-reader/${novel.id}" data-nav>
+      <div class="recent-cover novel-recent-cover">
+        <span class="novel-recent-name">${escapeHtml(novel.name)}</span>
+      </div>
+      <div class="recent-name">${escapeHtml(novel.name)}</div>
+      <div class="recent-progress">已读${progress}%</div>
+    </a>
+  `;
 }
 
 function novelGridHTML(novel) {
