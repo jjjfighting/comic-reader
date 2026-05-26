@@ -1,7 +1,7 @@
-import { renderLibrary, applyTheme } from './library.js';
-import { renderComicList } from './comicList.js';
+import { renderLibrary, applyTheme, abortLibrary } from './library.js';
+import { renderComicList, abortComicList } from './comicList.js';
 import { renderReader } from './reader.js';
-import { renderNovelPage } from './novel.js';
+import { renderNovelPage, abortNovel } from './novel.js';
 import { renderNovelReader } from './novelReader.js';
 
 const app = document.getElementById('app');
@@ -24,8 +24,16 @@ if ('serviceWorker' in navigator) {
   });
 }
 
+function cleanupPages() {
+  abortLibrary();
+  abortComicList();
+  abortNovel();
+}
+
 function route() {
   const hash = window.location.hash || '#/';
+
+  cleanupPages();
 
   if (window.__readerCleanup && !hash.startsWith('#/reader/')) {
     window.__readerCleanup();

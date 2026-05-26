@@ -4,8 +4,13 @@ import { renderTabBar } from './library.js';
 
 let novelAbortCtrl = null;
 
-export async function renderNovelPage(app) {
+export function abortNovel() {
   if (novelAbortCtrl) novelAbortCtrl.abort();
+  novelAbortCtrl = null;
+}
+
+export async function renderNovelPage(app) {
+  abortNovel();
   novelAbortCtrl = new AbortController();
   const { signal } = novelAbortCtrl;
 

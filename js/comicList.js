@@ -4,8 +4,13 @@ import { renderCategoryAssignSheet } from './categories.js';
 
 let listAbortCtrl = null;
 
-export async function renderComicList(app, categoryId) {
+export function abortComicList() {
   if (listAbortCtrl) listAbortCtrl.abort();
+  listAbortCtrl = null;
+}
+
+export async function renderComicList(app, categoryId) {
+  abortComicList();
   listAbortCtrl = new AbortController();
   const { signal } = listAbortCtrl;
 

@@ -5,8 +5,13 @@ import { renderCategoryAssignSheet, renderCategoryManageSheet } from './categori
 
 let libraryAbortCtrl = null;
 
-export async function renderLibrary(app) {
+export function abortLibrary() {
   if (libraryAbortCtrl) libraryAbortCtrl.abort();
+  libraryAbortCtrl = null;
+}
+
+export async function renderLibrary(app) {
+  abortLibrary();
   libraryAbortCtrl = new AbortController();
   const { signal } = libraryAbortCtrl;
   const comics = await getAllComics();
