@@ -240,16 +240,22 @@ body {
   overflow: hidden;
 }
 
+.novel-grid {
+  grid-template-columns: repeat(4, 1fr);
+}
+
 .novel-grid-cover {
+  aspect-ratio: auto;
+  height: 140px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
 }
 
 .novel-grid-title {
   color: #fff;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 500;
   line-height: 1.4;
-  padding: 10px;
+  padding: 8px;
   text-align: center;
   display: -webkit-box;
   -webkit-line-clamp: 3;

@@ -32,7 +32,7 @@ export async function renderNovelPage(app) {
           <p>还没有小说，点击右上角 ＋ 导入</p>
         </div>
       ` : `
-        <div class="comic-grid" id="novel-list">
+        <div class="comic-grid novel-grid" id="novel-list">
           ${allSorted.map(n => novelGridHTML(n)).join('')}
         </div>
       `}
