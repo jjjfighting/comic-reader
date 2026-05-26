@@ -210,6 +210,7 @@ body {
 .comic-grid-cover {
   width: 100%;
   aspect-ratio: 3/4;
+  max-height: 200px;
   border-radius: 8px;
   background: var(--chip-bg);
   overflow: hidden;
