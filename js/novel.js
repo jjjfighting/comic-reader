@@ -50,7 +50,6 @@ function novelGridHTML(novel) {
         <div class="comic-grid-cover novel-grid-cover">
           <span class="novel-grid-title">${escapeHtml(novel.name)}</span>
         </div>
-        <button class="comic-grid-delete" data-delete-novel="${novel.id}">✕</button>
       </a>
     </div>
   `;
@@ -86,7 +85,6 @@ function bindNovelEvents(app, novels, tags) {
       list.innerHTML = filtered.length === 0
         ? '<div class="empty-state"><p>没有找到小说</p></div>'
         : filtered.map(n => novelGridHTML(n)).join('');
-      bindDeleteButtons(app);
     }
   });
 
@@ -111,7 +109,6 @@ function bindNovelEvents(app, novels, tags) {
       list.innerHTML = filtered.length === 0
         ? '<div class="empty-state"><p>该标签下没有小说</p></div>'
         : filtered.map(n => novelGridHTML(n)).join('');
-      bindDeleteButtons(app);
     }
   });
 
@@ -130,10 +127,7 @@ function bindNovelEvents(app, novels, tags) {
     showTagManageSheet(tags, app);
   });
 
-  // Delete buttons
-  bindDeleteButtons(app);
-
-  // Long press for tag assignment
+  // Long press for context menu
   let pressTimer = null;
   app.addEventListener('contextmenu', (e) => {
     if (e.target.closest('.comic-grid-link')) e.preventDefault();
@@ -146,7 +140,7 @@ function bindNovelEvents(app, novels, tags) {
       const row = link.closest('.comic-grid-item');
       const novelId = row.dataset.novelId;
       const novel = await getNovel(novelId);
-      if (novel) showTagAssignSheet(tags, novel, app);
+      if (novel) showNovelContextSheet(tags, novel, app);
     }, 500);
   }, { passive: false });
   app.addEventListener('touchend', () => clearTimeout(pressTimer));
@@ -278,20 +272,42 @@ function showTagManageSheet(tags, app) {
   document.body.appendChild(overlay);
 }
 
-function bindDeleteButtons(app) {
-  app.querySelectorAll('[data-delete-novel]').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const novelId = btn.dataset.deleteNovel;
-      const item = btn.closest('.comic-grid-item');
-      const name = item.querySelector('.comic-grid-name')?.textContent || '这部小说';
-      if (confirm(`确定删除「${name}」？此操作不可恢复。`)) {
-        await deleteNovel(novelId);
-        renderNovelPage(app);
-      }
-    });
-  });
+function showNovelContextSheet(tags, novel, app) {
+  const overlay = document.createElement('div');
+  overlay.className = 'modal-overlay';
+  overlay.onclick = (e) => { if (e.target === overlay) overlay.remove(); };
+
+  const sheet = document.createElement('div');
+  sheet.className = 'modal-sheet';
+
+  sheet.innerHTML = `
+    <div class="sheet-header">
+      <span class="sheet-title">${escapeHtml(novel.name)}</span>
+      <button class="sheet-close">取消</button>
+    </div>
+    <div class="cat-list">
+      <div class="cat-item" id="ctx-assign-tag"><span class="cat-name">分配标签</span></div>
+      <div class="cat-item" id="ctx-delete" style="color:#ff3b30;"><span class="cat-name">删除小说</span></div>
+    </div>
+  `;
+
+  sheet.querySelector('.sheet-close').onclick = () => overlay.remove();
+
+  sheet.querySelector('#ctx-assign-tag').onclick = () => {
+    overlay.remove();
+    showTagAssignSheet(tags, novel, app);
+  };
+
+  sheet.querySelector('#ctx-delete').onclick = async () => {
+    overlay.remove();
+    if (confirm(`确定删除「${novel.name}」？此操作不可恢复。`)) {
+      await deleteNovel(novel.id);
+      renderNovelPage(app);
+    }
+  };
+
+  overlay.appendChild(sheet);
+  document.body.appendChild(overlay);
 }
 
 function escapeHtml(str) {

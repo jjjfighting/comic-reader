@@ -48,12 +48,10 @@ export async function renderComicList(app, categoryId) {
         ? '<div class="empty-state"><p>没有找到漫画</p></div>'
         : filtered.map(c => comicGridHTML(c)).join('');
       loadCovers(list, filtered);
-      setupDeleteButtons(app, comics);
     }
   });
 
   setupContextMenu(app, comics, categories);
-  setupDeleteButtons(app, comics);
   loadCovers(app, comics);
 }
 
@@ -64,7 +62,6 @@ function comicGridHTML(comic) {
         <div class="comic-grid-cover" data-cover-id="${comic.id}">
           <span class="placeholder-icon">📖</span>
         </div>
-        <button class="comic-grid-delete" data-delete-id="${comic.id}">✕</button>
       </a>
       <div class="comic-grid-name">${escapeHtml(comic.name)}</div>
     </div>
@@ -143,20 +140,4 @@ function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
-}
-
-function setupDeleteButtons(app, comics) {
-  app.querySelectorAll('.comic-grid-delete').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const comicId = btn.dataset.deleteId;
-      const item = btn.closest('.comic-grid-item');
-      const name = item.querySelector('.comic-grid-name')?.textContent || '这部漫画';
-      if (confirm(`确定删除「${name}」？此操作不可恢复。`)) {
-        await deleteComic(comicId);
-        renderComicList(app, null);
-      }
-    });
-  });
 }

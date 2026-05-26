@@ -85,7 +85,6 @@ function comicGridHTML(comic) {
         <div class="comic-grid-cover" data-cover-id="${comic.id}">
           <span class="placeholder-icon">📖</span>
         </div>
-        <button class="comic-grid-delete" data-delete-id="${comic.id}">✕</button>
       </a>
       <div class="comic-grid-name">${escapeHtml(comic.name)}</div>
     </div>
@@ -129,23 +128,6 @@ function bindLibraryEvents(app, categories) {
     renderCategoryManageSheet(categories, async (updatedCats) => {
       document.querySelector('.modal-overlay')?.remove();
       renderLibrary(app);
-    });
-  });
-
-  // Delete buttons
-  app.querySelectorAll('.comic-grid-delete').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      const comicId = btn.dataset.deleteId;
-      const item = btn.closest('.comic-grid-item');
-      const name = item.querySelector('.comic-grid-name')?.textContent || '这部漫画';
-      if (confirm(`确定删除「${name}」？此操作不可恢复。`)) {
-        showToast('正在删除...');
-        await deleteComic(comicId);
-        showToast('已删除');
-        renderLibrary(app);
-      }
     });
   });
 

@@ -229,31 +229,6 @@ body {
   color: var(--text-secondary);
 }
 
-.comic-grid-delete {
-  position: absolute;
-  top: 4px;
-  right: 4px;
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(0, 0, 0, 0.5);
-  color: #fff;
-  font-size: 11px;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1;
-  opacity: 0;
-  transition: opacity 0.15s;
-}
-
-.comic-grid-item:hover .comic-grid-delete,
-.comic-grid-delete:active {
-  opacity: 1;
-}
-
 .comic-grid-name {
   font-size: 12px;
   margin-top: 4px;
