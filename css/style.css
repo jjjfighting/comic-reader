@@ -693,7 +693,7 @@ body {
   overflow-y: auto;
   overflow-x: hidden;
   -webkit-overflow-scrolling: touch;
-  padding: max(52px, calc(env(safe-area-inset-top) + 44px)) 12px 60px;
+  padding: max(52px, calc(env(safe-area-inset-top) + 44px)) 12px 60px 20px;
 }
 
 .novel-content p {
