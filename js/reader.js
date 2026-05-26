@@ -83,6 +83,7 @@ export async function renderReader(app, comicId) {
   const widthBtn = document.getElementById('reader-width-btn');
   const modes = ['full', 'narrow', 'xnarrow'];
   let currentMode = modes.indexOf(widthMode);
+  let fullModeAnchor = null; // remember position when leaving full mode
 
   function applyWidthMode(mode) {
     const w = calcWidth(mode, scrollEl);
@@ -92,11 +93,23 @@ export async function renderReader(app, comicId) {
 
   widthBtn.addEventListener('click', (e) => {
     e.stopPropagation();
-    const targetIndex = lastVisibleIndex;
+    const oldMode = modes[currentMode];
+    // Save anchor when leaving full mode
+    if (oldMode === 'full') {
+      fullModeAnchor = lastVisibleIndex;
+    }
     currentMode = (currentMode + 1) % modes.length;
     const mode = modes[currentMode];
     localStorage.setItem('comic-width-mode', mode);
     applyWidthMode(mode);
+    // When returning to full, restore the original anchor
+    const targetIndex = (mode === 'full' && fullModeAnchor !== null) ? fullModeAnchor : lastVisibleIndex;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        const slot = document.querySelector(`[data-img-index="${targetIndex}"]`);
+        if (slot) slot.scrollIntoView({ block: 'start' });
+      });
+    });
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
         const slot = document.querySelector(`[data-img-index="${targetIndex}"]`);
