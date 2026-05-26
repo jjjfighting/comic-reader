@@ -213,7 +213,7 @@ html {
 .comic-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 12px;
+  gap: 10px;
 }
 
 .comic-grid-item {
@@ -233,8 +233,7 @@ html {
 
 .comic-grid-cover {
   width: 100%;
-  aspect-ratio: 3/4;
-  height: 160px;
+  height: 150px;
   border-radius: 8px;
   background: var(--chip-bg);
   overflow: hidden;

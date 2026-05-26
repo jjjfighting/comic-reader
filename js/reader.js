@@ -14,8 +14,28 @@ export async function renderReader(app, comicId) {
 
   // Width mode: full, narrow, extra-narrow
   const widthMode = localStorage.getItem('comic-width-mode') || 'full';
-  const widthMap = { full: '100%', narrow: '75%', xnarrow: '50%' };
   const modeLabels = { full: '全宽', narrow: '窄图', xnarrow: '超窄' };
+
+  function calcWidth(mode, scrollEl) {
+    if (mode === 'full') return '100%';
+    const viewportH = scrollEl.clientHeight;
+    const slots = scrollEl.querySelectorAll('.reader-img-slot img');
+    if (slots.length === 0) return mode === 'narrow' ? '80%' : '60%';
+    // Average image height ratio (image height / viewport)
+    let totalRatio = 0;
+    let count = 0;
+    slots.forEach(img => {
+      totalRatio += img.clientHeight / viewportH;
+      count++;
+    });
+    const avgRatio = count > 0 ? totalRatio / count : 1;
+    const n = Math.round(1 / avgRatio); // images visible at full width
+    if (mode === 'narrow') {
+      return Math.max(30, Math.round(n / (n + 1) * 100)) + '%';
+    } else {
+      return Math.max(20, Math.round(n / (n + 2) * 100)) + '%';
+    }
+  }
 
   app.innerHTML = `
     <div class="reader-page" id="reader-page">
@@ -24,7 +44,7 @@ export async function renderReader(app, comicId) {
         <span class="title">${escapeHtml(comic.name)}</span>
       </div>
       <div class="reader-scroll" id="reader-scroll" style="visibility:hidden;">
-        <div class="reader-images" id="reader-images" style="max-width:${widthMap[widthMode]};margin:0 auto;">
+        <div class="reader-images" id="reader-images" style="margin:0 auto;">
           ${imageIds.map((id, i) => `
             <div class="reader-img-slot" data-img-index="${i}" data-img-id="${id}">
               <div class="loading" style="height:400px;color:#666;">加载中...</div>
@@ -64,18 +84,24 @@ export async function renderReader(app, comicId) {
   const modes = ['full', 'narrow', 'xnarrow'];
   let currentMode = modes.indexOf(widthMode);
 
+  function applyWidthMode(mode) {
+    const w = calcWidth(mode, scrollEl);
+    imagesEl.style.maxWidth = w;
+    widthBtn.textContent = modeLabels[mode];
+  }
+
   widthBtn.addEventListener('click', (e) => {
     e.stopPropagation();
     const targetIndex = lastVisibleIndex;
     currentMode = (currentMode + 1) % modes.length;
     const mode = modes[currentMode];
     localStorage.setItem('comic-width-mode', mode);
-    imagesEl.style.maxWidth = widthMap[mode];
-    widthBtn.textContent = modeLabels[mode];
-    // Restore scroll to current image after layout change
+    applyWidthMode(mode);
     requestAnimationFrame(() => {
-      const slot = document.querySelector(`[data-img-index="${targetIndex}"]`);
-      if (slot) slot.scrollIntoView({ block: 'start' });
+      requestAnimationFrame(() => {
+        const slot = document.querySelector(`[data-img-index="${targetIndex}"]`);
+        if (slot) slot.scrollIntoView({ block: 'start' });
+      });
     });
   });
 
@@ -142,6 +168,12 @@ export async function renderReader(app, comicId) {
 
   // Show content after position is set
   scrollEl.style.visibility = 'visible';
+
+  // Apply initial width mode after images are loaded
+  if (widthMode !== 'full') {
+    setTimeout(() => applyWidthMode(widthMode), 200);
+  }
+
   // Update initial progress display
   lastVisibleIndex = comic.lastReadImageIndex || 0;
   const initialPct = imageIds.length > 0 ? Math.round((lastVisibleIndex + 1) / imageIds.length * 100) : 0;
