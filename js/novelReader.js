@@ -112,7 +112,7 @@ export async function renderNovelReader(app, novelId) {
     const end = Math.min(start + CHUNK_SIZE, totalCount);
     let html = '';
     for (let i = start; i < end; i++) {
-      html += `<p>${escapeHtml(paragraphs[i])}</p>`;
+      html += `<p>${escapeHtml(paragraphs[i].trim())}</p>`;
     }
     placeholder.innerHTML = html;
     placeholder.dataset.rendered = '1';
@@ -374,7 +374,7 @@ function showTOC(chapters, scrollEl, contentEl, CHUNK_SIZE, renderVisibleChunks)
         const end = Math.min(start + CHUNK_SIZE, allParagraphs.length);
         let html = '';
         for (let i = start; i < end; i++) {
-          html += `<p>${escapeHtml(allParagraphs[i])}</p>`;
+          html += `<p>${escapeHtml(allParagraphs[i].trim())}</p>`;
         }
         chunkEl.innerHTML = html;
       }
