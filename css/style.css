@@ -247,11 +247,11 @@ body {
 .novel-grid-cover {
   aspect-ratio: auto;
   height: 160px;
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  background: linear-gradient(135deg, #e8d5a3 0%, #c8c9a1 100%);
 }
 
 .novel-grid-title {
-  color: #fff;
+  color: #3d3929;
   font-size: 13px;
   font-weight: 500;
   line-height: 1.4;
