@@ -24,7 +24,7 @@ export async function renderReader(app, comicId) {
         <span class="title">${escapeHtml(comic.name)}</span>
       </div>
       <div class="reader-scroll" id="reader-scroll" style="visibility:hidden;">
-        <div class="reader-images" id="reader-images" style="margin:0 auto;">
+        <div class="reader-images" id="reader-images" style="max-width:${widthMap[widthMode]};margin:0 auto;">
           ${imageIds.map((id, i) => `
             <div class="reader-img-slot" data-img-index="${i}" data-img-id="${id}">
               <div class="loading" style="height:400px;color:#666;">加载中...</div>
@@ -160,11 +160,6 @@ export async function renderReader(app, comicId) {
 
   // Show content after position is set
   scrollEl.style.visibility = 'visible';
-
-  // Apply initial width mode after images are loaded
-  if (widthMode !== 'full') {
-    setTimeout(() => applyWidthMode(widthMode), 200);
-  }
 
   // Update initial progress display
   lastVisibleIndex = comic.lastReadImageIndex || 0;
