@@ -75,11 +75,13 @@ function novelRecentHTML(novel) {
 }
 
 function novelGridHTML(novel) {
+  const progress = novel.totalChars > 0 ? Math.round(novel.lastReadOffset / novel.totalChars * 100) : 0;
   return `
     <div class="comic-grid-item" data-novel-id="${novel.id}">
       <a class="comic-grid-link" href="#/novel-reader/${novel.id}" data-nav>
         <div class="comic-grid-cover novel-grid-cover">
           <span class="novel-grid-title">${escapeHtml(novel.name)}</span>
+          ${progress > 0 ? `<span class="novel-grid-progress">已读${progress}%</span>` : ''}
         </div>
       </a>
     </div>
