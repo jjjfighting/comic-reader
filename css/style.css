@@ -336,6 +336,8 @@ html {
   top: 0;
   padding: 8px 16px;
   padding-top: max(8px, env(safe-area-inset-top));
+  padding-bottom: 10px;
+  margin-bottom: 4px;
   display: flex;
   align-items: center;
   gap: 12px;
