@@ -53,8 +53,8 @@ export async function renderLibrary(app) {
           <p>还没有漫画，点击右上角 ＋ 导入</p>
         </div>
       ` : `
-        <div class="comic-list" id="comic-list">
-          ${allSorted.map(c => comicRowHTML(c)).join('')}
+        <div class="comic-grid" id="comic-list">
+          ${allSorted.map(c => comicGridHTML(c)).join('')}
         </div>
       `}
     </div>
@@ -78,22 +78,16 @@ function recentCardHTML(comic) {
   `;
 }
 
-function comicRowHTML(comic) {
-  const progress = comic.totalImages > 0 ? Math.round(comic.lastReadImageIndex / comic.totalImages * 100) : 0;
+function comicGridHTML(comic) {
   return `
-    <div class="comic-row" data-comic-id="${comic.id}">
-      <a class="comic-row-link" href="#/reader/${comic.id}" data-nav>
-        <div class="comic-cover" data-cover-id="${comic.id}">
+    <div class="comic-grid-item" data-comic-id="${comic.id}">
+      <a class="comic-grid-link" href="#/reader/${comic.id}" data-nav>
+        <div class="comic-grid-cover" data-cover-id="${comic.id}">
           <span class="placeholder-icon">📖</span>
         </div>
-        <div class="comic-info">
-          <div class="comic-name">${escapeHtml(comic.name)}</div>
-          <div class="comic-meta">${comic.totalImages}页 · 已读${progress}%</div>
-          <div class="comic-progress-bar"><div class="comic-progress-fill" style="width:${progress}%"></div></div>
-        </div>
-        <span class="comic-chevron">›</span>
+        <button class="comic-grid-delete" data-delete-id="${comic.id}">✕</button>
       </a>
-      <button class="comic-delete-btn" data-delete-id="${comic.id}">✕</button>
+      <div class="comic-grid-name">${escapeHtml(comic.name)}</div>
     </div>
   `;
 }
@@ -139,13 +133,13 @@ function bindLibraryEvents(app, categories) {
   });
 
   // Delete buttons
-  app.querySelectorAll('.comic-delete-btn').forEach(btn => {
+  app.querySelectorAll('.comic-grid-delete').forEach(btn => {
     btn.addEventListener('click', async (e) => {
       e.preventDefault();
       e.stopPropagation();
       const comicId = btn.dataset.deleteId;
-      const row = btn.closest('.comic-row');
-      const name = row.querySelector('.comic-name')?.textContent || '这部漫画';
+      const item = btn.closest('.comic-grid-item');
+      const name = item.querySelector('.comic-grid-name')?.textContent || '这部漫画';
       if (confirm(`确定删除「${name}」？此操作不可恢复。`)) {
         showToast('正在删除...');
         await deleteComic(comicId);
@@ -171,7 +165,7 @@ function setupContextMenu(app) {
   let pressTimer = null;
 
   app.addEventListener('touchstart', (e) => {
-    const row = e.target.closest('.comic-row');
+    const row = e.target.closest('.comic-grid-item');
     if (!row) return;
     pressTimer = setTimeout(() => {
       e.preventDefault();

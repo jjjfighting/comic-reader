@@ -32,8 +32,8 @@ export async function renderComicList(app, categoryId) {
           <p>${categoryId ? '该分类下还没有漫画' : '还没有漫画'}</p>
         </div>
       ` : `
-        <div class="comic-list" id="comic-list">
-          ${comics.map(c => comicRowHTML(c)).join('')}
+        <div class="comic-grid" id="comic-list">
+          ${comics.map(c => comicGridHTML(c)).join('')}
         </div>
       `}
     </div>
@@ -46,29 +46,28 @@ export async function renderComicList(app, categoryId) {
     if (list) {
       list.innerHTML = filtered.length === 0
         ? '<div class="empty-state"><p>没有找到漫画</p></div>'
-        : filtered.map(c => comicRowHTML(c)).join('');
+        : filtered.map(c => comicGridHTML(c)).join('');
       loadCovers(list, filtered);
+      setupDeleteButtons(app, comics);
     }
   });
 
   setupContextMenu(app, comics, categories);
+  setupDeleteButtons(app, comics);
   loadCovers(app, comics);
 }
 
-function comicRowHTML(comic) {
-  const progress = comic.totalImages > 0 ? Math.round(comic.lastReadImageIndex / comic.totalImages * 100) : 0;
+function comicGridHTML(comic) {
   return `
-    <a class="comic-row" href="#/reader/${comic.id}" data-nav data-comic-id="${comic.id}">
-      <div class="comic-cover" data-cover-id="${comic.id}">
-        <span class="placeholder-icon">📖</span>
-      </div>
-      <div class="comic-info">
-        <div class="comic-name">${escapeHtml(comic.name)}</div>
-        <div class="comic-meta">${comic.totalImages}页 · 已读${progress}%</div>
-        <div class="comic-progress-bar"><div class="comic-progress-fill" style="width:${progress}%"></div></div>
-      </div>
-      <span class="comic-chevron">›</span>
-    </a>
+    <div class="comic-grid-item" data-comic-id="${comic.id}">
+      <a class="comic-grid-link" href="#/reader/${comic.id}" data-nav>
+        <div class="comic-grid-cover" data-cover-id="${comic.id}">
+          <span class="placeholder-icon">📖</span>
+        </div>
+        <button class="comic-grid-delete" data-delete-id="${comic.id}">✕</button>
+      </a>
+      <div class="comic-grid-name">${escapeHtml(comic.name)}</div>
+    </div>
   `;
 }
 
@@ -87,7 +86,7 @@ function setupContextMenu(app, comics, categories) {
   let pressTimer = null;
 
   app.addEventListener('touchstart', (e) => {
-    const row = e.target.closest('.comic-row');
+    const row = e.target.closest('.comic-grid-item');
     if (!row) return;
     pressTimer = setTimeout(() => {
       e.preventDefault();
@@ -144,4 +143,20 @@ function escapeHtml(str) {
   const div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+function setupDeleteButtons(app, comics) {
+  app.querySelectorAll('.comic-grid-delete').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const comicId = btn.dataset.deleteId;
+      const item = btn.closest('.comic-grid-item');
+      const name = item.querySelector('.comic-grid-name')?.textContent || '这部漫画';
+      if (confirm(`确定删除「${name}」？此操作不可恢复。`)) {
+        await deleteComic(comicId);
+        renderComicList(app, null);
+      }
+    });
+  });
 }
