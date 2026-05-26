@@ -453,7 +453,7 @@ html {
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,0.4);
-  z-index: 300;
+  z-index: 600;
   display: flex;
   align-items: flex-end;
   justify-content: center;
@@ -546,7 +546,7 @@ html {
 /* Context menu */
 .context-menu {
   position: fixed;
-  z-index: 400;
+  z-index: 600;
   background: var(--bg-secondary);
   border-radius: 14px;
   box-shadow: 0 4px 20px rgba(0,0,0,0.15);
