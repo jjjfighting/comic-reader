@@ -16,20 +16,29 @@ export async function renderReader(app, comicId) {
   const widthMode = localStorage.getItem('comic-width-mode') || 'full';
   const modeLabels = { full: '全宽', narrow: '窄图', xnarrow: '超窄' };
 
+  // Calculate n (images visible at full width) using natural image dimensions
+  function calcVisibleCount(scrollEl) {
+    const viewportH = scrollEl.clientHeight;
+    const viewportW = scrollEl.clientWidth;
+    const imgs = scrollEl.querySelectorAll('.reader-img-slot img');
+    if (imgs.length === 0) return 3;
+    let totalAspect = 0;
+    let count = 0;
+    imgs.forEach(img => {
+      if (img.naturalWidth > 0) {
+        totalAspect += img.naturalHeight / img.naturalWidth;
+        count++;
+      }
+    });
+    if (count === 0) return 3;
+    const avgAspect = totalAspect / count;
+    const imgHeightAtFull = viewportW * avgAspect;
+    return Math.max(1, Math.round(viewportH / imgHeightAtFull));
+  }
+
   function calcWidth(mode, scrollEl) {
     if (mode === 'full') return '100%';
-    const viewportH = scrollEl.clientHeight;
-    const slots = scrollEl.querySelectorAll('.reader-img-slot img');
-    if (slots.length === 0) return mode === 'narrow' ? '80%' : '60%';
-    // Average image height ratio (image height / viewport)
-    let totalRatio = 0;
-    let count = 0;
-    slots.forEach(img => {
-      totalRatio += img.clientHeight / viewportH;
-      count++;
-    });
-    const avgRatio = count > 0 ? totalRatio / count : 1;
-    const n = Math.round(1 / avgRatio); // images visible at full width
+    const n = calcVisibleCount(scrollEl);
     if (mode === 'narrow') {
       return Math.max(30, Math.round(n / (n + 1) * 100)) + '%';
     } else {
