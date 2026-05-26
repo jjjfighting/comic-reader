@@ -2,7 +2,13 @@ import { getAllNovels, getAllNovelTags, getNovel, deleteNovel, addNovelTag, dele
 import { importNovelFiles } from './novelImport.js';
 import { renderTabBar } from './library.js';
 
+let novelAbortCtrl = null;
+
 export async function renderNovelPage(app) {
+  if (novelAbortCtrl) novelAbortCtrl.abort();
+  novelAbortCtrl = new AbortController();
+  const { signal } = novelAbortCtrl;
+
   const novels = await getAllNovels();
   const tags = await getAllNovelTags();
   const allSorted = [...novels].sort((a, b) => new Date(b.importDate) - new Date(a.importDate));
@@ -129,22 +135,30 @@ function bindNovelEvents(app, novels, tags) {
 
   // Long press for context menu
   let pressTimer = null;
+  let longPressFired = false;
   app.addEventListener('contextmenu', (e) => {
-    if (e.target.closest('.comic-grid-link')) e.preventDefault();
-  });
+    if (e.target.closest('.comic-grid-link')) {
+      e.preventDefault();
+      clearTimeout(pressTimer);
+    }
+  }, { signal });
   app.addEventListener('touchstart', (e) => {
     const link = e.target.closest('.comic-grid-link');
     if (!link) return;
+    longPressFired = false;
     pressTimer = setTimeout(async () => {
-      e.preventDefault();
+      longPressFired = true;
       const row = link.closest('.comic-grid-item');
       const novelId = row.dataset.novelId;
       const novel = await getNovel(novelId);
       if (novel) showNovelContextSheet(tags, novel, app);
     }, 500);
-  }, { passive: false });
-  app.addEventListener('touchend', () => clearTimeout(pressTimer));
-  app.addEventListener('touchmove', () => clearTimeout(pressTimer));
+  }, { passive: true, signal });
+  app.addEventListener('touchend', (e) => {
+    clearTimeout(pressTimer);
+    if (longPressFired) e.preventDefault();
+  }, { signal });
+  app.addEventListener('touchmove', () => clearTimeout(pressTimer), { signal });
 }
 
 function showTagAssignSheet(tags, novel, app) {

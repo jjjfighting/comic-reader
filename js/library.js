@@ -3,7 +3,12 @@ import { importFiles } from './import.js';
 import { blobToObjectURL } from './thumbnail.js';
 import { renderCategoryAssignSheet, renderCategoryManageSheet } from './categories.js';
 
+let libraryAbortCtrl = null;
+
 export async function renderLibrary(app) {
+  if (libraryAbortCtrl) libraryAbortCtrl.abort();
+  libraryAbortCtrl = new AbortController();
+  const { signal } = libraryAbortCtrl;
   const comics = await getAllComics();
   const categories = await getAllCategories();
 
@@ -140,27 +145,35 @@ function bindLibraryEvents(app, categories) {
     }
   });
 
-  setupContextMenu(app);
+  setupContextMenu(app, signal);
 }
 
-function setupContextMenu(app) {
-  app.addEventListener('contextmenu', (e) => {
-    if (e.target.closest('.comic-grid-link')) e.preventDefault();
-  });
+function setupContextMenu(app, signal) {
   let pressTimer = null;
+  let longPressFired = false;
+  app.addEventListener('contextmenu', (e) => {
+    if (e.target.closest('.comic-grid-link')) {
+      e.preventDefault();
+      clearTimeout(pressTimer);
+    }
+  }, { signal });
 
   app.addEventListener('touchstart', (e) => {
     const row = e.target.closest('.comic-grid-item');
     if (!row) return;
+    longPressFired = false;
     pressTimer = setTimeout(() => {
-      e.preventDefault();
+      longPressFired = true;
       const comicId = row.dataset.comicId;
       showContextMenu(app, comicId, row);
     }, 500);
-  }, { passive: false });
+  }, { passive: true, signal });
 
-  app.addEventListener('touchend', () => clearTimeout(pressTimer));
-  app.addEventListener('touchmove', () => clearTimeout(pressTimer));
+  app.addEventListener('touchend', (e) => {
+    clearTimeout(pressTimer);
+    if (longPressFired) e.preventDefault();
+  }, { signal });
+  app.addEventListener('touchmove', () => clearTimeout(pressTimer), { signal });
 }
 
 async function showContextMenu(app, comicId, row) {

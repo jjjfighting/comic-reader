@@ -2,7 +2,13 @@ import { getAllComics, getAllCategories, getComic, getImageBlob, deleteComic } f
 import { blobToObjectURL } from './thumbnail.js';
 import { renderCategoryAssignSheet } from './categories.js';
 
+let listAbortCtrl = null;
+
 export async function renderComicList(app, categoryId) {
+  if (listAbortCtrl) listAbortCtrl.abort();
+  listAbortCtrl = new AbortController();
+  const { signal } = listAbortCtrl;
+
   const allComics = await getAllComics();
   const categories = await getAllCategories();
   const category = categoryId ? categories.find(c => c.id === categoryId) : null;
@@ -51,7 +57,7 @@ export async function renderComicList(app, categoryId) {
     }
   });
 
-  setupContextMenu(app, comics, categories);
+  setupContextMenu(app, comics, categories, signal);
   loadCovers(app, comics);
 }
 
@@ -79,21 +85,32 @@ async function loadCovers(container, comics) {
   }
 }
 
-function setupContextMenu(app, comics, categories) {
+function setupContextMenu(app, comics, categories, signal) {
   let pressTimer = null;
+  let longPressFired = false;
+  app.addEventListener('contextmenu', (e) => {
+    if (e.target.closest('.comic-grid-link')) {
+      e.preventDefault();
+      clearTimeout(pressTimer);
+    }
+  }, { signal });
 
   app.addEventListener('touchstart', (e) => {
     const row = e.target.closest('.comic-grid-item');
     if (!row) return;
+    longPressFired = false;
     pressTimer = setTimeout(() => {
-      e.preventDefault();
+      longPressFired = true;
       const comicId = row.dataset.comicId;
       showContextMenu(app, comicId, comics, categories);
     }, 500);
-  }, { passive: false });
+  }, { passive: true, signal });
 
-  app.addEventListener('touchend', () => clearTimeout(pressTimer));
-  app.addEventListener('touchmove', () => clearTimeout(pressTimer));
+  app.addEventListener('touchend', (e) => {
+    clearTimeout(pressTimer);
+    if (longPressFired) e.preventDefault();
+  }, { signal });
+  app.addEventListener('touchmove', () => clearTimeout(pressTimer), { signal });
 }
 
 async function showContextMenu(app, comicId, comics, categories) {
