@@ -3,6 +3,8 @@ import { getNovel, getNovelText, updateNovel } from './db.js';
 let saveTimer = null;
 let cleanupFns = [];
 let allParagraphs = [];
+let charOffsets = [];
+let totalChars = 0;
 
 export async function renderNovelReader(app, novelId) {
   // Cleanup previous session
@@ -34,6 +36,13 @@ export async function renderNovelReader(app, novelId) {
   allParagraphs = text.split(/\n+/).filter(p => p.trim());
   const paragraphs = allParagraphs;
   const totalCount = paragraphs.length;
+  totalChars = novel.totalChars || text.length;
+
+  // Build char offset map: charOffsets[i] = starting char offset of paragraph i
+  charOffsets = [0];
+  for (let i = 0; i < paragraphs.length; i++) {
+    charOffsets.push(charOffsets[i] + paragraphs[i].length + 1);
+  }
 
   // Detect chapters
   const chapters = detectChapters(paragraphs);
@@ -115,7 +124,7 @@ export async function renderNovelReader(app, novelId) {
     for (let i = start; i < end; i++) {
       const isChapter = chapterIndices.has(i);
       const cls = isChapter ? ' class="chapter-title"' : '';
-      html += `<p${cls}>${escapeHtml(paragraphs[i].trim())}</p>`;
+      html += `<p${cls} data-p-index="${i}">${escapeHtml(paragraphs[i].trim())}</p>`;
     }
     placeholder.innerHTML = html;
     placeholder.dataset.rendered = '1';
@@ -146,7 +155,8 @@ export async function renderNovelReader(app, novelId) {
 
   // Back
   document.getElementById('novel-back').onclick = () => {
-    saveProgressNow(novelId, novel, scrollEl.scrollTop, scrollEl.scrollHeight);
+    const { offset } = getVisibleProgress();
+    saveProgressNow(novelId, offset);
     doCleanup();
     window.history.back();
   };
@@ -157,7 +167,25 @@ export async function renderNovelReader(app, novelId) {
     document.getElementById('novel-bottom-bar')?.classList.toggle('novel-bar-hidden');
     settingsPanel.classList.add('hidden');
   };
-  scrollEl.addEventListener('click', toggleBars);
+
+  scrollEl.addEventListener('click', (e) => {
+    const barsHidden = document.getElementById('novel-top-bar')?.classList.contains('novel-bar-hidden');
+    if (barsHidden) {
+      const rect = scrollEl.getBoundingClientRect();
+      const relY = (e.clientY - rect.top) / rect.height;
+      if (relY < 0.3) {
+        // Top 30%: page up
+        scrollEl.scrollBy({ top: -scrollEl.clientHeight * 0.9, behavior: 'smooth' });
+        return;
+      }
+      if (relY > 0.7) {
+        // Bottom 30%: page down
+        scrollEl.scrollBy({ top: scrollEl.clientHeight * 0.9, behavior: 'smooth' });
+        return;
+      }
+    }
+    toggleBars();
+  });
 
   // TOC button
   document.getElementById('novel-toc-btn').addEventListener('click', (e) => {
@@ -197,9 +225,7 @@ export async function renderNovelReader(app, novelId) {
 
   // Scroll: render visible chunks + track progress
   scrollEl.addEventListener('scroll', () => {
-    const scrollTop = scrollEl.scrollTop;
-    const scrollHeight = scrollEl.scrollHeight - scrollEl.clientHeight;
-    const pct = scrollHeight > 0 ? Math.round(scrollTop / scrollHeight * 100) : 0;
+    const { offset, pct } = getVisibleProgress();
     progressEl.style.width = pct + '%';
     pctEl.textContent = pct + '%';
 
@@ -209,38 +235,53 @@ export async function renderNovelReader(app, novelId) {
     // Debounced save
     clearTimeout(saveTimer);
     saveTimer = setTimeout(() => {
-      saveProgressNow(novelId, novel, scrollTop, scrollEl.scrollHeight);
+      saveProgressNow(novelId, offset);
     }, 500);
   });
 
-  // Restore scroll position
-  if (novel.lastReadOffset > 0 && novel.totalChars > 0) {
-    // Estimate position based on character ratio
-    const ratio = novel.lastReadOffset / novel.totalChars;
-    // Need a small delay for layout to settle
-    await new Promise(r => setTimeout(r, 50));
-    const scrollHeight = scrollEl.scrollHeight - scrollEl.clientHeight;
-    scrollEl.scrollTop = Math.round(ratio * scrollHeight);
-    // Render chunks at new position
-    renderVisibleChunks();
+  // Restore scroll position using char offset
+  if (novel.lastReadOffset > 0 && totalChars > 0) {
+    // Binary search charOffsets to find paragraph index
+    let targetIdx = 0;
+    let lo = 0, hi = charOffsets.length - 1;
+    while (lo <= hi) {
+      const mid = (lo + hi) >> 1;
+      if (charOffsets[mid] <= novel.lastReadOffset) {
+        targetIdx = mid;
+        lo = mid + 1;
+      } else {
+        hi = mid - 1;
+      }
+    }
+
+    const targetChunk = Math.floor(targetIdx / CHUNK_SIZE);
+    // Ensure the target chunk and surrounding chunks are rendered
+    for (let c = Math.max(0, targetChunk - 1); c <= Math.min(totalChunks - 1, targetChunk + 1); c++) {
+      renderChunk(c);
+    }
+    await new Promise(r => requestAnimationFrame(r));
+
+    const targetP = contentEl.querySelector(`p[data-p-index="${targetIdx}"]`);
+    if (targetP) targetP.scrollIntoView({ block: 'start' });
   }
 
   scrollEl.style.visibility = 'visible';
 
   // Initial progress display
-  const initScrollHeight = scrollEl.scrollHeight - scrollEl.clientHeight;
-  const initPct = initScrollHeight > 0 ? Math.round(scrollEl.scrollTop / initScrollHeight * 100) : 0;
-  progressEl.style.width = initPct + '%';
-  pctEl.textContent = initPct + '%';
+  const initProgress = getVisibleProgress();
+  progressEl.style.width = initProgress.pct + '%';
+  pctEl.textContent = initProgress.pct + '%';
 
   // Save on background/close - with proper cleanup
   const visHandler = () => {
     if (document.visibilityState === 'hidden') {
-      saveProgressNow(novelId, novel, scrollEl.scrollTop, scrollEl.scrollHeight);
+      const { offset } = getVisibleProgress();
+      saveProgressNow(novelId, offset);
     }
   };
   const beforeUnloadHandler = () => {
-    saveProgressNow(novelId, novel, scrollEl.scrollTop, scrollEl.scrollHeight);
+    const { offset } = getVisibleProgress();
+    saveProgressNow(novelId, offset);
   };
 
   document.addEventListener('visibilitychange', visHandler);
@@ -260,18 +301,33 @@ function doCleanup() {
   for (const fn of cleanupFns) fn();
   cleanupFns = [];
   clearTimeout(saveTimer);
+  charOffsets = [];
+  totalChars = 0;
 }
 
-async function saveProgressNow(novelId, novel, scrollTop, scrollHeight) {
-  // Verify novel still exists before saving
+function getVisibleProgress() {
+  const scrollEl = document.getElementById('novel-scroll');
+  const contentEl = document.getElementById('novel-content');
+  if (!scrollEl || !contentEl) return { offset: 0, pct: 0 };
+
+  const scrollRect = scrollEl.getBoundingClientRect();
+  const viewportTop = scrollRect.top + scrollRect.height * 0.2;
+  const pElements = contentEl.querySelectorAll('p[data-p-index]');
+  for (const p of pElements) {
+    if (p.getBoundingClientRect().bottom > viewportTop) {
+      const idx = parseInt(p.dataset.pIndex);
+      const offset = charOffsets[idx];
+      const pct = totalChars > 0 ? Math.round(offset / totalChars * 100) : 0;
+      return { offset, pct };
+    }
+  }
+  return { offset: 0, pct: 0 };
+}
+
+async function saveProgressNow(novelId, charOffset) {
   const current = await getNovel(novelId);
   if (!current) return;
-
-  const scrollEl = document.getElementById('novel-scroll');
-  const clientHeight = scrollEl?.clientHeight || 1;
-  const maxScroll = scrollHeight - clientHeight;
-  const ratio = maxScroll > 0 ? scrollTop / maxScroll : 0;
-  current.lastReadOffset = Math.round(ratio * current.totalChars);
+  current.lastReadOffset = charOffset;
   try {
     await updateNovel(current);
   } catch (e) {
@@ -379,7 +435,7 @@ function showTOC(chapters, scrollEl, contentEl, CHUNK_SIZE, renderVisibleChunks)
         for (let i = start; i < end; i++) {
           const isChapter = chapterIndices.has(i);
           const cls = isChapter ? ' class="chapter-title"' : '';
-          html += `<p${cls}>${escapeHtml(allParagraphs[i].trim())}</p>`;
+          html += `<p${cls} data-p-index="${i}">${escapeHtml(allParagraphs[i].trim())}</p>`;
         }
         chunkEl.innerHTML = html;
       }

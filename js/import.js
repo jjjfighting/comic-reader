@@ -1,4 +1,4 @@
-import { addComic, addImageBlob } from './db.js';
+import { addComic, addImageBlob, addZipBlob } from './db.js';
 import { generateThumbnail } from './thumbnail.js';
 
 const IMAGE_EXTS = new Set(['jpg', 'jpeg', 'png', 'webp', 'heic', 'gif', 'bmp']);
@@ -36,10 +36,9 @@ export async function importFiles(fileList) {
 
 async function importOneFile(file) {
   const comicId = generateId();
-  const imageIds = [];
-  let thumbBlob = null;
 
-  const zip = await JSZip.loadAsync(file, { streamFiles: true });
+  // Read ZIP to get file list and extract first image for thumbnail
+  const zip = await JSZip.loadAsync(file);
 
   const entries = [];
   zip.forEach((path, entry) => {
@@ -53,31 +52,26 @@ async function importOneFile(file) {
     throw new Error('No images found in archive');
   }
 
-  for (let i = 0; i < entries.length; i++) {
-    const { path, entry: zipEntry } = entries[i];
-    const imageId = `${comicId}/${path}`;
-    const blob = await zipEntry.async('blob');
-    await addImageBlob(imageId, blob, comicId);
-    imageIds.push(imageId);
-
-    // Generate thumbnail from first image
-    if (i === 0) {
-      thumbBlob = await generateThumbnail(blob);
-    }
-
-    // Free memory for this entry
-    zipEntry._data = null;
-  }
-
+  // Extract first image for cover thumbnail only
+  const firstBlob = await entries[0].entry.async('blob');
+  const thumbBlob = await generateThumbnail(firstBlob);
   if (thumbBlob) {
     await addImageBlob(`${comicId}/__cover__`, thumbBlob, comicId);
   }
+
+  // Store image paths (sorted) for on-demand extraction
+  const imagePaths = entries.map(e => e.path);
+
+  // Store the ZIP file as-is
+  await addZipBlob(comicId, file);
 
   const name = file.name.replace(/\.(zip|cbz)$/i, '');
   const comic = {
     id: comicId,
     name,
     coverBlobKey: `${comicId}/__cover__`,
+    zipBlobKey: comicId,
+    imagePaths,
     totalImages: entries.length,
     lastReadImageIndex: 0,
     lastReadScrollOffset: 0,

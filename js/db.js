@@ -1,5 +1,5 @@
 const DB_NAME = 'comic-reader';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
 let dbPromise = null;
 
@@ -43,6 +43,10 @@ function openDB() {
         const textStore = db.createObjectStore('novelTexts', { keyPath: 'id' });
         textStore.createIndex('novelId', 'novelId');
       }
+
+      if (!db.objectStoreNames.contains('zipBlobs')) {
+        db.createObjectStore('zipBlobs', { keyPath: 'id' });
+      }
     };
 
     request.onsuccess = (e) => resolve(e.target.result);
@@ -85,8 +89,9 @@ export async function getAllComics() {
 export async function deleteComic(id) {
   const db = await openDB();
   return new Promise((resolve, reject) => {
-    const tx = db.transaction(['comics', 'imageBlobs'], 'readwrite');
+    const tx = db.transaction(['comics', 'imageBlobs', 'zipBlobs'], 'readwrite');
     tx.objectStore('comics').delete(id);
+    tx.objectStore('zipBlobs').delete(id);
     const imgStore = tx.objectStore('imageBlobs');
     const index = imgStore.index('comicId');
     const req = index.openCursor(IDBKeyRange.only(id));
@@ -117,6 +122,26 @@ export async function getImageBlob(id) {
   return new Promise((resolve, reject) => {
     const tx = db.transaction('imageBlobs', 'readonly');
     const req = tx.objectStore('imageBlobs').get(id);
+    req.onsuccess = () => resolve(req.result?.blob || null);
+    req.onerror = (e) => reject(e.target.error);
+  });
+}
+
+export async function addZipBlob(comicId, blob) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('zipBlobs', 'readwrite');
+    tx.objectStore('zipBlobs').put({ id: comicId, blob });
+    tx.oncomplete = () => resolve();
+    tx.onerror = (e) => reject(e.target.error);
+  });
+}
+
+export async function getZipBlob(comicId) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction('zipBlobs', 'readonly');
+    const req = tx.objectStore('zipBlobs').get(comicId);
     req.onsuccess = () => resolve(req.result?.blob || null);
     req.onerror = (e) => reject(e.target.error);
   });
