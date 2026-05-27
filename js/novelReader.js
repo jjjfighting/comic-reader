@@ -486,36 +486,50 @@ function showTOC(chapters, scrollEl, contentEl, CHUNK_SIZE, renderVisibleChunks,
   });
 
   function bindTocItems(container, chs, scrollEl, contentEl, CHUNK_SIZE, renderVisibleChunks, overlay) {
-    container.querySelectorAll('.toc-item').forEach(btn => {
-      btn.addEventListener('click', () => {
-        const chapterIndex = parseInt(btn.dataset.chapter);
-        const chapter = chs[chapterIndex];
-        const targetP = chapter.paragraphIndex;
+    function navigate(btn) {
+      const chapterIndex = parseInt(btn.dataset.chapter);
+      const chapter = chs[chapterIndex];
+      const targetP = chapter.paragraphIndex;
 
-        const targetChunk = Math.floor(targetP / CHUNK_SIZE);
-        const indexInChunk = targetP % CHUNK_SIZE;
+      const targetChunk = Math.floor(targetP / CHUNK_SIZE);
+      const indexInChunk = targetP % CHUNK_SIZE;
 
-        const chunkEl = contentEl.querySelector(`[data-chunk="${targetChunk}"]`);
-        if (chunkEl && !chunkEl.dataset.rendered) {
-          chunkEl.dataset.rendered = '1';
-          const start = targetChunk * CHUNK_SIZE;
-          const end = Math.min(start + CHUNK_SIZE, allParagraphs.length);
-          let html = '';
-          for (let i = start; i < end; i++) {
-            const isChapter = chapterIndices.has(i);
-            const cls = isChapter ? ' class="chapter-title"' : '';
-            html += `<p${cls} data-p-index="${i}">${escapeHtml(allParagraphs[i].trim())}</p>`;
-          }
-          chunkEl.innerHTML = html;
+      const chunkEl = contentEl.querySelector(`[data-chunk="${targetChunk}"]`);
+      if (chunkEl && !chunkEl.dataset.rendered) {
+        chunkEl.dataset.rendered = '1';
+        const start = targetChunk * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, allParagraphs.length);
+        let html = '';
+        for (let i = start; i < end; i++) {
+          const isChapter = chapterIndices.has(i);
+          const cls = isChapter ? ' class="chapter-title"' : '';
+          html += `<p${cls} data-p-index="${i}">${escapeHtml(allParagraphs[i].trim())}</p>`;
         }
+        chunkEl.innerHTML = html;
+      }
 
+      // Close overlay first, then scroll (avoids iOS scroll-after-overlay issue)
+      overlay.remove();
+      requestAnimationFrame(() => {
         const pElements = chunkEl?.querySelectorAll('p');
         if (pElements && pElements[indexInChunk]) {
           pElements[indexInChunk].scrollIntoView({ block: 'start' });
         }
-
-        overlay.remove();
         renderVisibleChunks();
+      });
+    }
+
+    container.querySelectorAll('.toc-item').forEach(btn => {
+      btn.addEventListener('click', () => navigate(btn));
+      // Fallback for iOS: touchend fires reliably after scrolling
+      let touchMoved = false;
+      btn.addEventListener('touchstart', () => { touchMoved = false; }, { passive: true });
+      btn.addEventListener('touchmove', () => { touchMoved = true; }, { passive: true });
+      btn.addEventListener('touchend', (e) => {
+        if (!touchMoved) {
+          e.preventDefault();
+          navigate(btn);
+        }
       });
     });
   }
