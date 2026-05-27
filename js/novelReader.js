@@ -65,7 +65,7 @@ export async function renderNovelReader(app, novelId) {
       }
       placeholder.innerHTML = html;
     }
-    return chapters;
+    return { chapters, chapterIndices };
   }
 
   // Virtual rendering: render chunks of paragraphs
@@ -219,7 +219,7 @@ export async function renderNovelReader(app, novelId) {
   // TOC button
   document.getElementById('novel-toc-btn').addEventListener('click', (e) => {
     e.stopPropagation();
-    showTOC(chapters, scrollEl, contentEl, CHUNK_SIZE, renderVisibleChunks, novel, refreshChapters);
+    showTOC(chapters, chapterIndices, scrollEl, contentEl, CHUNK_SIZE, renderVisibleChunks, novel, refreshChapters);
   });
 
   // Settings
@@ -438,7 +438,7 @@ function detectChapters(paragraphs, customPattern) {
   return chapters;
 }
 
-function showTOC(chapters, scrollEl, contentEl, CHUNK_SIZE, renderVisibleChunks, novel, refreshChapters) {
+function showTOC(chapters, chapterIndices, scrollEl, contentEl, CHUNK_SIZE, renderVisibleChunks, novel, refreshChapters) {
   // Remove existing
   document.querySelector('.toc-overlay')?.remove();
 
@@ -473,19 +473,21 @@ function showTOC(chapters, scrollEl, contentEl, CHUNK_SIZE, renderVisibleChunks,
   sidebar.querySelector('.toc-close').onclick = () => overlay.remove();
 
   // Custom pattern input
+  let currentChapterIndices = chapterIndices;
   const patternInput = sidebar.querySelector('#chapter-pattern-input');
   patternInput.addEventListener('input', () => {
     const pattern = patternInput.value.trim() || undefined;
     novel.chapterPattern = pattern;
-    const newChapters = refreshChapters(pattern);
-    sidebar.querySelector('.toc-header h3').textContent = `目录 (${newChapters.length}章)`;
+    const result = refreshChapters(pattern);
+    currentChapterIndices = result.chapterIndices;
+    sidebar.querySelector('.toc-header h3').textContent = `目录 (${result.chapters.length}章)`;
     const tocList = sidebar.querySelector('#toc-list');
-    tocList.innerHTML = renderTocList(newChapters);
-    bindTocItems(tocList, newChapters, scrollEl, contentEl, CHUNK_SIZE, renderVisibleChunks, overlay);
+    tocList.innerHTML = renderTocList(result.chapters);
+    bindTocItems(tocList, result.chapters, currentChapterIndices, scrollEl, contentEl, CHUNK_SIZE, renderVisibleChunks, overlay);
     updateNovel(novel);
   });
 
-  function bindTocItems(container, chs, scrollEl, contentEl, CHUNK_SIZE, renderVisibleChunks, overlay) {
+  function bindTocItems(container, chs, chIndices, scrollEl, contentEl, CHUNK_SIZE, renderVisibleChunks, overlay) {
     function navigate(btn) {
       const chapterIndex = parseInt(btn.dataset.chapter);
       const chapter = chs[chapterIndex];
@@ -501,7 +503,7 @@ function showTOC(chapters, scrollEl, contentEl, CHUNK_SIZE, renderVisibleChunks,
         const end = Math.min(start + CHUNK_SIZE, allParagraphs.length);
         let html = '';
         for (let i = start; i < end; i++) {
-          const isChapter = chapterIndices.has(i);
+          const isChapter = chIndices.has(i);
           const cls = isChapter ? ' class="chapter-title"' : '';
           html += `<p${cls} data-p-index="${i}">${escapeHtml(allParagraphs[i].trim())}</p>`;
         }
@@ -534,7 +536,7 @@ function showTOC(chapters, scrollEl, contentEl, CHUNK_SIZE, renderVisibleChunks,
     });
   }
 
-  bindTocItems(sidebar.querySelector('#toc-list'), chapters, scrollEl, contentEl, CHUNK_SIZE, renderVisibleChunks, overlay);
+  bindTocItems(sidebar.querySelector('#toc-list'), chapters, currentChapterIndices, scrollEl, contentEl, CHUNK_SIZE, renderVisibleChunks, overlay);
 
   overlay.appendChild(sidebar);
   document.body.appendChild(overlay);
