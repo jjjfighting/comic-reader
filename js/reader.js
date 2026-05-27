@@ -91,7 +91,7 @@ export async function renderReader(app, comicId) {
     }
     const rect = scrollEl.getBoundingClientRect();
     const relY = (e.clientY - rect.top) / rect.height;
-    const behavior = pageSmooth ? 'smooth' : 'instant';
+    const behavior = pageSmooth ? 'smooth' : 'auto';
     if (relY < 0.3) {
       scrollEl.scrollBy({ top: -scrollEl.clientHeight * 0.8, behavior });
     } else if (relY > 0.7) {

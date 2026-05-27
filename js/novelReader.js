@@ -203,7 +203,7 @@ export async function renderNovelReader(app, novelId) {
     if (barsHidden) {
       const rect = scrollEl.getBoundingClientRect();
       const relY = (e.clientY - rect.top) / rect.height;
-      const behavior = pageSmooth ? 'smooth' : 'instant';
+      const behavior = pageSmooth ? 'smooth' : 'auto';
       if (relY < 0.3) {
         scrollEl.scrollBy({ top: -scrollEl.clientHeight * 0.8, behavior });
         return;
@@ -300,14 +300,16 @@ export async function renderNovelReader(app, novelId) {
     }
 
     const targetChunk = Math.floor(targetIdx / CHUNK_SIZE);
-    // Ensure the target chunk and surrounding chunks are rendered
-    for (let c = Math.max(0, targetChunk - 1); c <= Math.min(totalChunks - 1, targetChunk + 1); c++) {
+    // Render ALL chunks from 0 to target to ensure accurate DOM positions
+    for (let c = 0; c <= Math.min(totalChunks - 1, targetChunk + 1); c++) {
       renderChunk(c);
     }
-    await new Promise(r => requestAnimationFrame(r));
+    await new Promise(r => requestAnimationFrame(() => requestAnimationFrame(r)));
 
     const targetP = contentEl.querySelector(`p[data-p-index="${targetIdx}"]`);
-    if (targetP) targetP.scrollIntoView({ block: 'start' });
+    if (targetP) {
+      targetP.scrollIntoView({ block: 'start' });
+    }
   }
 
   scrollEl.style.visibility = 'visible';
