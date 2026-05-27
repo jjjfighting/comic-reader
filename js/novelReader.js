@@ -182,9 +182,9 @@ export async function renderNovelReader(app, novelId) {
   }
 
   // Back
-  document.getElementById('novel-back').onclick = () => {
+  document.getElementById('novel-back').onclick = async () => {
     const { offset } = getVisibleProgress();
-    saveProgressNow(novelId, offset);
+    await saveProgressNow(novelId, offset);
     doCleanup();
     window.history.back();
   };
@@ -280,6 +280,11 @@ export async function renderNovelReader(app, novelId) {
   });
 
   // Restore scroll position using char offset
+  // Check localStorage backup first (more reliable than IndexedDB on iOS PWA)
+  const lsOffset = localStorage.getItem(`novel-progress-${novelId}`);
+  if (lsOffset !== null) {
+    novel.lastReadOffset = Math.max(novel.lastReadOffset || 0, parseInt(lsOffset) || 0);
+  }
   if (novel.lastReadOffset > 0 && totalChars > 0) {
     // Binary search charOffsets to find paragraph index
     let targetIdx = 0;
@@ -365,6 +370,9 @@ function getVisibleProgress() {
 }
 
 async function saveProgressNow(novelId, charOffset) {
+  // Sync write to localStorage (instant, survives app kill)
+  localStorage.setItem(`novel-progress-${novelId}`, charOffset);
+  // Async write to IndexedDB (may not complete if app suspended)
   const current = await getNovel(novelId);
   if (!current) return;
   current.lastReadOffset = charOffset;
