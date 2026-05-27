@@ -35,8 +35,11 @@ export async function importFiles(fileList) {
 }
 
 async function importOneFile(file) {
-  const zip = await JSZip.loadAsync(file);
   const comicId = generateId();
+  const imageIds = [];
+  let thumbBlob = null;
+
+  const zip = await JSZip.loadAsync(file, { streamFiles: true });
 
   const entries = [];
   zip.forEach((path, entry) => {
@@ -50,17 +53,22 @@ async function importOneFile(file) {
     throw new Error('No images found in archive');
   }
 
-  const imageIds = [];
   for (let i = 0; i < entries.length; i++) {
     const { path, entry: zipEntry } = entries[i];
     const imageId = `${comicId}/${path}`;
     const blob = await zipEntry.async('blob');
     await addImageBlob(imageId, blob, comicId);
     imageIds.push(imageId);
+
+    // Generate thumbnail from first image
+    if (i === 0) {
+      thumbBlob = await generateThumbnail(blob);
+    }
+
+    // Free memory for this entry
+    zipEntry._data = null;
   }
 
-  const firstBlob = await entries[0].entry.async('blob');
-  const thumbBlob = await generateThumbnail(firstBlob);
   if (thumbBlob) {
     await addImageBlob(`${comicId}/__cover__`, thumbBlob, comicId);
   }
