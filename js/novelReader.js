@@ -32,6 +32,10 @@ export async function renderNovelReader(app, novelId) {
     return;
   }
 
+  // Update lastReadDate immediately, before any async saves can race
+  novel.lastReadDate = new Date().toISOString();
+  await updateNovel(novel);
+
   // Split into paragraphs
   allParagraphs = text.split(/\n+/).filter(p => p.trim());
   const paragraphs = allParagraphs;
@@ -310,7 +314,10 @@ export async function renderNovelReader(app, novelId) {
 
     const targetP = contentEl.querySelector(`p[data-p-index="${targetIdx}"]`);
     if (targetP) {
-      targetP.scrollIntoView({ block: 'start' });
+      // Direct scrollTop instead of scrollIntoView (more reliable on iOS)
+      const scrollRect = scrollEl.getBoundingClientRect();
+      const targetRect = targetP.getBoundingClientRect();
+      scrollEl.scrollTop = targetRect.top - scrollRect.top;
     }
   }
 
@@ -341,9 +348,6 @@ export async function renderNovelReader(app, novelId) {
     () => window.removeEventListener('beforeunload', beforeUnloadHandler),
     () => clearTimeout(saveTimer),
   ];
-
-  novel.lastReadDate = new Date().toISOString();
-  await updateNovel(novel);
 }
 
 function doCleanup() {
