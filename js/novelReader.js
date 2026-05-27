@@ -205,11 +205,11 @@ export async function renderNovelReader(app, novelId) {
       const relY = (e.clientY - rect.top) / rect.height;
       const behavior = pageSmooth ? 'smooth' : 'instant';
       if (relY < 0.3) {
-        scrollEl.scrollBy({ top: -scrollEl.clientHeight * 0.9, behavior });
+        scrollEl.scrollBy({ top: -scrollEl.clientHeight * 0.8, behavior });
         return;
       }
       if (relY > 0.7) {
-        scrollEl.scrollBy({ top: scrollEl.clientHeight * 0.9, behavior });
+        scrollEl.scrollBy({ top: scrollEl.clientHeight * 0.8, behavior });
         return;
       }
     }

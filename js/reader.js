@@ -27,6 +27,7 @@ export async function renderReader(app, comicId) {
 
   // Width mode
   const widthMode = localStorage.getItem('comic-width-mode') || 'full';
+  const smoothScroll = localStorage.getItem('comic-smoothScroll') !== 'false';
   const modeLabels = { full: '全宽', narrow: '窄图', xnarrow: '超窄' };
   const widthMap = { full: '100%', narrow: '80%', xnarrow: '60%' };
 
@@ -50,6 +51,7 @@ export async function renderReader(app, comicId) {
         <div class="meta">
           <span id="reader-page-info">第 0/${totalCount} 页</span>
           <button class="reader-width-btn" id="reader-width-btn">${modeLabels[widthMode]}</button>
+          <button class="reader-width-btn" id="reader-smooth-btn">${smoothScroll ? '流畅' : '快速'}</button>
           <span id="reader-percent">0%</span>
         </div>
       </div>
@@ -79,8 +81,24 @@ export async function renderReader(app, comicId) {
     window.history.back();
   };
 
-  scrollEl.addEventListener('click', () => {
-    readerPage.classList.toggle('bars-hidden');
+  let pageSmooth = smoothScroll;
+
+  scrollEl.addEventListener('click', (e) => {
+    const barsHidden = readerPage.classList.contains('bars-hidden');
+    if (!barsHidden) {
+      readerPage.classList.toggle('bars-hidden');
+      return;
+    }
+    const rect = scrollEl.getBoundingClientRect();
+    const relY = (e.clientY - rect.top) / rect.height;
+    const behavior = pageSmooth ? 'smooth' : 'instant';
+    if (relY < 0.3) {
+      scrollEl.scrollBy({ top: -scrollEl.clientHeight * 0.8, behavior });
+    } else if (relY > 0.7) {
+      scrollEl.scrollBy({ top: scrollEl.clientHeight * 0.8, behavior });
+    } else {
+      readerPage.classList.toggle('bars-hidden');
+    }
   });
 
   // Width mode toggle
@@ -110,6 +128,15 @@ export async function renderReader(app, comicId) {
         if (slot) slot.scrollIntoView({ block: 'start' });
       });
     });
+  });
+
+  // Smooth scroll toggle
+  const smoothBtn = document.getElementById('reader-smooth-btn');
+  smoothBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    pageSmooth = !pageSmooth;
+    localStorage.setItem('comic-smoothScroll', pageSmooth);
+    smoothBtn.textContent = pageSmooth ? '流畅' : '快速';
   });
 
   // Image loading with buffer
