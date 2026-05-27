@@ -45,8 +45,28 @@ export async function renderNovelReader(app, novelId) {
   }
 
   // Detect chapters
-  const chapters = detectChapters(paragraphs);
-  const chapterIndices = new Set(chapters.map(ch => ch.paragraphIndex));
+  let chapters = detectChapters(paragraphs, novel.chapterPattern);
+  let chapterIndices = new Set(chapters.map(ch => ch.paragraphIndex));
+
+  function refreshChapters(customPattern) {
+    chapters = detectChapters(paragraphs, customPattern);
+    chapterIndices = new Set(chapters.map(ch => ch.paragraphIndex));
+    // Re-render all rendered chunks to update chapter-title class
+    for (const chunkIdx of renderedChunks) {
+      const placeholder = contentEl.querySelector(`[data-chunk="${chunkIdx}"]`);
+      if (!placeholder) continue;
+      const start = chunkIdx * CHUNK_SIZE;
+      const end = Math.min(start + CHUNK_SIZE, totalCount);
+      let html = '';
+      for (let i = start; i < end; i++) {
+        const isChapter = chapterIndices.has(i);
+        const cls = isChapter ? ' class="chapter-title"' : '';
+        html += `<p${cls} data-p-index="${i}">${escapeHtml(paragraphs[i].trim())}</p>`;
+      }
+      placeholder.innerHTML = html;
+    }
+    return chapters;
+  }
 
   // Virtual rendering: render chunks of paragraphs
   const CHUNK_SIZE = 200; // paragraphs per chunk
@@ -56,6 +76,7 @@ export async function renderNovelReader(app, novelId) {
   // Reading settings
   const fontSize = localStorage.getItem('novel-fontSize') || '18';
   const bgColor = localStorage.getItem('novel-bgColor') || '#F5EFDA';
+  const smoothScroll = localStorage.getItem('novel-smoothScroll') !== 'false';
   const textColor = bgColor === '#1A1A1A' ? '#CCCCCC' : '#333333';
 
   app.innerHTML = `
@@ -95,6 +116,13 @@ export async function renderNovelReader(app, novelId) {
             <button class="color-btn ${bgColor === '#F5EFDA' ? 'active' : ''}" data-color="#F5EFDA" style="background:#F5EFDA;border:1px solid #ddd;"></button>
             <button class="color-btn ${bgColor === '#CCE8CF' ? 'active' : ''}" data-color="#CCE8CF" style="background:#CCE8CF;border:1px solid #ddd;"></button>
             <button class="color-btn ${bgColor === '#1A1A1A' ? 'active' : ''}" data-color="#1A1A1A" style="background:#1A1A1A;border:1px solid #444;"></button>
+          </div>
+        </div>
+        <div class="settings-row">
+          <span>翻页动画</span>
+          <div class="settings-btns">
+            <button class="settings-btn ${smoothScroll ? 'active' : ''}" data-smooth="true">流畅</button>
+            <button class="settings-btn ${!smoothScroll ? 'active' : ''}" data-smooth="false">快速</button>
           </div>
         </div>
       </div>
@@ -168,19 +196,20 @@ export async function renderNovelReader(app, novelId) {
     settingsPanel.classList.add('hidden');
   };
 
+  let pageSmooth = smoothScroll;
+
   scrollEl.addEventListener('click', (e) => {
     const barsHidden = document.getElementById('novel-top-bar')?.classList.contains('novel-bar-hidden');
     if (barsHidden) {
       const rect = scrollEl.getBoundingClientRect();
       const relY = (e.clientY - rect.top) / rect.height;
+      const behavior = pageSmooth ? 'smooth' : 'instant';
       if (relY < 0.3) {
-        // Top 30%: page up
-        scrollEl.scrollBy({ top: -scrollEl.clientHeight * 0.9, behavior: 'smooth' });
+        scrollEl.scrollBy({ top: -scrollEl.clientHeight * 0.9, behavior });
         return;
       }
       if (relY > 0.7) {
-        // Bottom 30%: page down
-        scrollEl.scrollBy({ top: scrollEl.clientHeight * 0.9, behavior: 'smooth' });
+        scrollEl.scrollBy({ top: scrollEl.clientHeight * 0.9, behavior });
         return;
       }
     }
@@ -190,7 +219,7 @@ export async function renderNovelReader(app, novelId) {
   // TOC button
   document.getElementById('novel-toc-btn').addEventListener('click', (e) => {
     e.stopPropagation();
-    showTOC(chapters, scrollEl, contentEl, CHUNK_SIZE, renderVisibleChunks);
+    showTOC(chapters, scrollEl, contentEl, CHUNK_SIZE, renderVisibleChunks, novel, refreshChapters);
   });
 
   // Settings
@@ -219,6 +248,17 @@ export async function renderNovelReader(app, novelId) {
       contentEl.style.color = color === '#1A1A1A' ? '#CCCCCC' : '#333333';
       document.querySelector('.novel-end').style.color = color === '#1A1A1A' ? '#666' : '#999';
       settingsPanel.querySelectorAll('.color-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+    });
+  });
+
+  settingsPanel.querySelectorAll('[data-smooth]').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const val = btn.dataset.smooth === 'true';
+      pageSmooth = val;
+      localStorage.setItem('novel-smoothScroll', val);
+      settingsPanel.querySelectorAll('[data-smooth]').forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
     });
   });
@@ -350,9 +390,21 @@ function escapeHtml(str) {
   return div.innerHTML;
 }
 
-function detectChapters(paragraphs) {
+function detectChapters(paragraphs, customPattern) {
   const chapters = [];
-  // Common Chinese chapter patterns
+
+  // Custom pattern takes priority
+  if (customPattern) {
+    for (let i = 0; i < paragraphs.length; i++) {
+      const line = paragraphs[i].trim();
+      if (line.length > 1 && line.length < 80 && line.includes(customPattern)) {
+        chapters.push({ title: line.slice(0, 60), paragraphIndex: i });
+      }
+    }
+    if (chapters.length > 0) return chapters;
+  }
+
+  // Default patterns
   const chapterPatterns = [
     /^第[零一二三四五六七八九十百千万\d]+[章节回卷集部篇话]/,
     /^Chapter\s+\d+/i,
@@ -386,7 +438,7 @@ function detectChapters(paragraphs) {
   return chapters;
 }
 
-function showTOC(chapters, scrollEl, contentEl, CHUNK_SIZE, renderVisibleChunks) {
+function showTOC(chapters, scrollEl, contentEl, CHUNK_SIZE, renderVisibleChunks, novel, refreshChapters) {
   // Remove existing
   document.querySelector('.toc-overlay')?.remove();
 
@@ -397,59 +449,78 @@ function showTOC(chapters, scrollEl, contentEl, CHUNK_SIZE, renderVisibleChunks)
   const sidebar = document.createElement('div');
   sidebar.className = 'toc-sidebar';
 
+  function renderTocList(chs) {
+    return chs.length === 0
+      ? '<div style="padding:20px;color:var(--text-secondary);text-align:center;">未检测到章节</div>'
+      : chs.map((ch, i) => `<button class="toc-item" data-chapter="${i}">${escapeHtml(ch.title)}</button>`).join('');
+  }
+
   sidebar.innerHTML = `
     <div class="toc-header">
       <h3>目录 (${chapters.length}章)</h3>
       <button class="toc-close">关闭</button>
     </div>
-    <div class="toc-list">
-      ${chapters.length === 0
-        ? '<div style="padding:20px;color:var(--text-secondary);text-align:center;">未检测到章节</div>'
-        : chapters.map((ch, i) => `<button class="toc-item" data-chapter="${i}">${escapeHtml(ch.title)}</button>`).join('')
-      }
+    <div style="padding:8px 12px;border-bottom:1px solid var(--border-color);">
+      <input type="text" id="chapter-pattern-input" placeholder="自定义章节标识，如 【 或 序章"
+        value="${escapeHtml(novel.chapterPattern || '')}"
+        style="width:100%;padding:6px 8px;border:1px solid var(--border-color);border-radius:6px;font-size:14px;background:var(--bg);color:var(--text);">
+    </div>
+    <div class="toc-list" id="toc-list">
+      ${renderTocList(chapters)}
     </div>
   `;
 
   sidebar.querySelector('.toc-close').onclick = () => overlay.remove();
 
-  sidebar.querySelectorAll('.toc-item').forEach(btn => {
-    btn.addEventListener('click', () => {
-      const chapterIndex = parseInt(btn.dataset.chapter);
-      const chapter = chapters[chapterIndex];
-      const targetP = chapter.paragraphIndex;
-
-      // Find the paragraph in the DOM - it's in one of the chunk divs
-      // Estimate: find the chunk and paragraph within it
-      const CHUNK_SIZE = 200;
-      const targetChunk = Math.floor(targetP / CHUNK_SIZE);
-      const indexInChunk = targetP % CHUNK_SIZE;
-
-      // Ensure the chunk is rendered first
-      const chunkEl = contentEl.querySelector(`[data-chunk="${targetChunk}"]`);
-      if (chunkEl && !chunkEl.dataset.rendered) {
-        // Force render this chunk
-        chunkEl.dataset.rendered = '1';
-        const start = targetChunk * CHUNK_SIZE;
-        const end = Math.min(start + CHUNK_SIZE, allParagraphs.length);
-        let html = '';
-        for (let i = start; i < end; i++) {
-          const isChapter = chapterIndices.has(i);
-          const cls = isChapter ? ' class="chapter-title"' : '';
-          html += `<p${cls} data-p-index="${i}">${escapeHtml(allParagraphs[i].trim())}</p>`;
-        }
-        chunkEl.innerHTML = html;
-      }
-
-      // Now find the specific paragraph
-      const pElements = chunkEl?.querySelectorAll('p');
-      if (pElements && pElements[indexInChunk]) {
-        pElements[indexInChunk].scrollIntoView({ block: 'start' });
-      }
-
-      overlay.remove();
-      renderVisibleChunks();
-    });
+  // Custom pattern input
+  const patternInput = sidebar.querySelector('#chapter-pattern-input');
+  patternInput.addEventListener('input', () => {
+    const pattern = patternInput.value.trim() || undefined;
+    novel.chapterPattern = pattern;
+    const newChapters = refreshChapters(pattern);
+    sidebar.querySelector('.toc-header h3').textContent = `目录 (${newChapters.length}章)`;
+    const tocList = sidebar.querySelector('#toc-list');
+    tocList.innerHTML = renderTocList(newChapters);
+    bindTocItems(tocList, newChapters, scrollEl, contentEl, CHUNK_SIZE, renderVisibleChunks, overlay);
+    updateNovel(novel);
   });
+
+  function bindTocItems(container, chs, scrollEl, contentEl, CHUNK_SIZE, renderVisibleChunks, overlay) {
+    container.querySelectorAll('.toc-item').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const chapterIndex = parseInt(btn.dataset.chapter);
+        const chapter = chs[chapterIndex];
+        const targetP = chapter.paragraphIndex;
+
+        const targetChunk = Math.floor(targetP / CHUNK_SIZE);
+        const indexInChunk = targetP % CHUNK_SIZE;
+
+        const chunkEl = contentEl.querySelector(`[data-chunk="${targetChunk}"]`);
+        if (chunkEl && !chunkEl.dataset.rendered) {
+          chunkEl.dataset.rendered = '1';
+          const start = targetChunk * CHUNK_SIZE;
+          const end = Math.min(start + CHUNK_SIZE, allParagraphs.length);
+          let html = '';
+          for (let i = start; i < end; i++) {
+            const isChapter = chapterIndices.has(i);
+            const cls = isChapter ? ' class="chapter-title"' : '';
+            html += `<p${cls} data-p-index="${i}">${escapeHtml(allParagraphs[i].trim())}</p>`;
+          }
+          chunkEl.innerHTML = html;
+        }
+
+        const pElements = chunkEl?.querySelectorAll('p');
+        if (pElements && pElements[indexInChunk]) {
+          pElements[indexInChunk].scrollIntoView({ block: 'start' });
+        }
+
+        overlay.remove();
+        renderVisibleChunks();
+      });
+    });
+  }
+
+  bindTocItems(sidebar.querySelector('#toc-list'), chapters, scrollEl, contentEl, CHUNK_SIZE, renderVisibleChunks, overlay);
 
   overlay.appendChild(sidebar);
   document.body.appendChild(overlay);
