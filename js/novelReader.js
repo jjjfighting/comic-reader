@@ -203,13 +203,15 @@ export async function renderNovelReader(app, novelId) {
     if (barsHidden) {
       const rect = scrollEl.getBoundingClientRect();
       const relY = (e.clientY - rect.top) / rect.height;
-      const behavior = pageSmooth ? 'smooth' : 'auto';
+      const delta = scrollEl.clientHeight * 0.8;
       if (relY < 0.3) {
-        scrollEl.scrollBy({ top: -scrollEl.clientHeight * 0.8, behavior });
+        if (pageSmooth) scrollEl.scrollBy({ top: -delta, behavior: 'smooth' });
+        else scrollEl.scrollTop = Math.max(0, scrollEl.scrollTop - delta);
         return;
       }
       if (relY > 0.7) {
-        scrollEl.scrollBy({ top: scrollEl.clientHeight * 0.8, behavior });
+        if (pageSmooth) scrollEl.scrollBy({ top: delta, behavior: 'smooth' });
+        else scrollEl.scrollTop = scrollEl.scrollTop + delta;
         return;
       }
     }
